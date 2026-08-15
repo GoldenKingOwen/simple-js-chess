@@ -56,6 +56,8 @@ export interface Game {
   pgn: string;
   viewers: number;
   currentPlayerColor: GameColor;
+  /** The viewer's own color when the backend knows it (online games). */
+  myColor?: GameColor;
 }
 
 export interface Move {

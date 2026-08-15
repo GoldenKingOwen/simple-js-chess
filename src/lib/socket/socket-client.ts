@@ -35,7 +35,8 @@ function ensureSocket(): GameSocket | null {
 
   socket.on("connect", () => {
     updateConnection("connected");
-    if (authToken) socket?.emit(SOCKET_EVENTS.authenticate, { token: authToken });
+    // Identity is derived from the handshake token (auth: { token }); an
+    // unauthenticated handshake is rejected by the gateway with connect_error.
   });
   socket.on("disconnect", () => updateConnection("disconnected"));
   socket.on("connect_error", () => {

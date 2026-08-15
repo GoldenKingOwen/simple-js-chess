@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Check, Gamepad2, Link2, Plus, Swords, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { MatchmakingScreen } from "@/components/online/matchmaking-screen";
+import { onSocket } from "@/lib/socket/socket-client";
+import { SOCKET_EVENTS } from "@/lib/socket/socket-events";
 import { gameService } from "@/services/game-service";
 import { TIME_CONTROL_LIST, timeControlLabel } from "@/config/time-controls";
 import type { MatchmakingTicket, TimeControlId } from "@/types";
@@ -42,6 +44,37 @@ function OnlineLobby() {
   const startMatchmaking = useCallback(async () => {
     setTicket(await gameService.startMatchmaking({ timeControlId, rated }));
   }, [timeControlId, rated]);
+
+  // While searching, the backend emits `matchmakingMatched` when an opponent
+  // is found — turn that into a found ticket so the countdown can start.
+  useEffect(() => {
+    if (!ticket || ticket.status !== "searching") return;
+    return onSocket(SOCKET_EVENTS.matchmakingMatched, (payload) => {
+      gameService
+        .getGame(payload.gameId)
+        .then((game) => {
+          const color = game.myColor ?? "w";
+          setTicket((current) =>
+            current
+              ? {
+                  ...current,
+                  status: "found",
+                  matchedGameId: payload.gameId,
+                  match: {
+                    opponent: color === "w" ? game.black.user : game.white.user,
+                    gameId: payload.gameId,
+                    color,
+                    countdownMs: 5_000,
+                  },
+                }
+              : current,
+          );
+        })
+        .catch(() => {
+          // Game not fetchable yet — the REST response will cover it.
+        });
+    });
+  }, [ticket]);
 
   const createGame = useCallback(async () => {
     setCreating(true);

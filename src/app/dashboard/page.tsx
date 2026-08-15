@@ -13,7 +13,6 @@ import { profileService } from "@/services/profile-service";
 import { gameService } from "@/services/game-service";
 import { friendService } from "@/services/friend-service";
 import { notificationService } from "@/services/notification-service";
-import { timeControlLabel } from "@/config/time-controls";
 import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
@@ -28,7 +27,7 @@ export default function DashboardPage() {
 
   const { data: recentGames, isLoading: gamesLoading } = useQuery({
     queryKey: ["games", "recent"],
-    queryFn: () => gameService.getGames(selfId),
+    queryFn: () => gameService.getGames(user?.username),
     enabled: Boolean(selfId),
   });
 
@@ -178,7 +177,7 @@ export default function DashboardPage() {
                           </span>
                           <span className="min-w-0 flex-1 truncate text-sm font-medium">vs {opponent.username}</span>
                           <span className="hidden text-xs text-muted-foreground sm:inline">
-                            {timeControlLabel(game.timeControl.id)}
+                            {game.timeControl.label}
                           </span>
                           <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                         </Link>

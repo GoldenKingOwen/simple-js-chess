@@ -1,94 +1,84 @@
-import type { ChatMessage } from "./chat";
-import type { Game, GameColor, GameResult, GameStatus } from "./game";
-
 /** Socket.IO connection status exposed to the UI. */
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "disconnected";
 
+/** Compact player payload the backend sends in presence events. */
+export interface SocketPlayer {
+  userId: string;
+  username: string;
+  [key: string]: unknown;
+}
+
 /**
- * Events the client emits to the future NestJS Socket.IO gateway.
- * Every event payload must remain in sync with `docs/backend-contract.md`.
+ * Events the client emits to the NestJS Socket.IO gateway.
+ * Keep in sync with docs/backend-contract.md — identity comes from the
+ * handshake token, never from payloads.
  */
 export interface ClientToServerEvents {
-  /** Send the auth token on connect (socket.io auth is preferred). */
-  authenticate: (payload: { token: string }) => void;
-  /** Join a game room as spectator or player. */
-  joinGame: (payload: { gameId: string; password?: string }) => void;
+  /** Join a game room. */
+  joinGame: (payload: { gameId: string }) => void;
   /** Leave a game room. */
   leaveGame: (payload: { gameId: string }) => void;
-  /** Submit a move. Move itself is validated by the authoritative backend. */
+  /** Submit a move. The move itself is validated by the authoritative backend. */
   makeMove: (payload: { gameId: string; from: string; to: string; promotion?: string }) => void;
   /** Resign from a game. */
   resignGame: (payload: { gameId: string }) => void;
   /** Offer a draw to the opponent. */
   offerDraw: (payload: { gameId: string }) => void;
-  /** Accept a pending draw offer. */
-  acceptDraw: (payload: { gameId: string }) => void;
-  /** Decline a pending draw offer. */
-  declineDraw: (payload: { gameId: string }) => void;
+  /** Accept or reject a pending draw offer. */
+  respondDraw: (payload: { gameId: string; accept: boolean }) => void;
   /** Send a chat message inside a game room. */
-  sendChatMessage: (payload: { gameId: string; body: string }) => void;
-  /** Request a rematch after a finished game. */
-  requestRematch: (payload: { gameId: string }) => void;
-  /** Enter the online matchmaking queue. */
-  startMatchmaking: (payload: { timeControlId: string; rated: boolean }) => void;
-  /** Cancel an active matchmaking search. */
-  cancelMatchmaking: () => void;
-  /** Send a friend request. */
-  sendFriendRequest: (payload: { userId: string }) => void;
-  /** Acknowledge a friend request. */
-  respondFriendRequest: (payload: { requestId: string; accept: boolean }) => void;
-  /** Send a challenge to a friend. */
-  sendChallenge: (payload: { userId: string; timeControlId: string; rated: boolean }) => void;
-  /** Join/leave the global matchmaking spectator feed. */
-  subscribeMatchmaking: () => void;
-  unsubscribeMatchmaking: () => void;
+  sendChatMessage: (payload: { gameId: string; message: string }) => void;
+  /** Ask the server for the full authoritative game state. */
+  requestGameState: (payload: { gameId: string }) => void;
+  /** Ask the server for a clock sync. */
+  requestClockSync: (payload: { gameId: string }) => void;
+  /** Update the player's presence. */
+  setPresence: (payload: { status: "ONLINE" | "AWAY" }) => void;
 }
 
 /**
- * Events the future NestJS Socket.IO gateway emits to clients.
+ * Events the NestJS Socket.IO gateway emits to clients.
+ * Payload shapes come straight from docs/backend-contract.md.
  */
 export interface ServerToClientEvents {
   /** Full authoritative game state (sent on join and after reconnects). */
-  gameState: (payload: Game) => void;
+  gameState: (payload: { gameId: string; game: Record<string, unknown> }) => void;
   /** A move was accepted and applied. */
-  moveMade: (payload: { game: Game; move: Game["moveHistory"][number] }) => void;
-  /** A new player (or spectator) joined the game room. */
-  playerJoined: (payload: { gameId: string; userId: string; username: string }) => void;
-  /** A player disconnected (clock keeps running / pause configured). */
-  playerDisconnected: (payload: { gameId: string; userId: string }) => void;
-  /** A player reconnected. */
-  playerReconnected: (payload: { gameId: string; userId: string }) => void;
-  /** The game finished (checkmate, stalemate, timeout, agreement...). */
-  gameEnded: (payload: { gameId: string; result: GameResult; game: Game }) => void;
-  /** The opponent offered a draw. */
-  drawOffered: (payload: { gameId: string; byUserId: string }) => void;
-  /** A draw offer was resolved. */
-  drawResolved: (payload: { gameId: string; accepted: boolean }) => void;
-  /** A chat message arrived. */
-  chatMessage: (payload: ChatMessage) => void;
-  /** A clock update tick (roughly every second during active play). */
-  clockTick: (payload: { gameId: string; whiteMs: number; blackMs: number; turn: GameColor }) => void;
-  /** Matchmaking status update while searching. */
-  matchmaking: (payload: { status: string; ticketId: string; queueSize: number }) => void;
-  /** An opponent was found. */
-  matchFound: (payload: {
-    ticketId: string;
+  moveMade: (payload: {
     gameId: string;
-    opponent: {
-      id: string;
-      username: string;
-      avatarUrl: string | null;
-      rating: number;
-    };
-    color: GameColor;
-    countdownMs: number;
-    timeControlId: string;
-    rated: boolean;
+    move: Record<string, unknown>;
+    game: Record<string, unknown>;
   }) => void;
-  /** Connection ping used to detect dead sockets. */
-  ping: () => void;
-  /** A general event with status metadata. */
-  event: (payload: { type: string; message: string; data?: unknown }) => void;
+  /** A player joined the game room. */
+  playerJoined: (payload: { gameId: string; player: SocketPlayer }) => void;
+  /** A player disconnected. */
+  playerDisconnected: (payload: { gameId: string; player: SocketPlayer }) => void;
+  /** A player reconnected. */
+  playerReconnected: (payload: { gameId: string; player: SocketPlayer }) => void;
+  /** The game finished (checkmate, stalemate, timeout, agreement...). */
+  gameEnded: (payload: { gameId: string; game: Record<string, unknown> }) => void;
+  /** The opponent offered a draw. */
+  drawOffered: (payload: { gameId: string; offeredBy: string }) => void;
+  /** A draw offer was accepted. */
+  drawAccepted: (payload: { gameId: string; acceptedBy: string }) => void;
+  /** A draw offer was rejected. */
+  drawRejected: (payload: { gameId: string; rejectedBy: string }) => void;
+  /** A chat message arrived. */
+  chatMessage: (payload: { gameId: string; message: Record<string, unknown> }) => void;
+  /** A clock tick (roughly every second during active play). */
+  clockUpdate: (payload: {
+    gameId: string;
+    whiteClockMs: number;
+    blackClockMs: number;
+    turn: "WHITE" | "BLACK";
+    timestamp: string;
+  }) => void;
+  /** Matchmaking found an opponent — the client should joinGame. */
+  matchmakingMatched: (payload: { gameId: string }) => void;
+  /** Matchmaking search was cancelled. */
+  matchmakingCancelled: () => void;
+  /** An error for the offending socket. */
+  error: (payload: { code: string; message: string }) => void;
 }
 
 export interface InterServerEvents {
@@ -99,23 +89,16 @@ export type SocketState = ConnectionStatus;
 
 export const SOCKET_EVENTS = {
   // Client → server
-  authenticate: "authenticate",
   joinGame: "joinGame",
   leaveGame: "leaveGame",
   makeMove: "makeMove",
   resignGame: "resignGame",
   offerDraw: "offerDraw",
-  acceptDraw: "acceptDraw",
-  declineDraw: "declineDraw",
+  respondDraw: "respondDraw",
   sendChatMessage: "sendChatMessage",
-  requestRematch: "requestRematch",
-  startMatchmaking: "startMatchmaking",
-  cancelMatchmaking: "cancelMatchmaking",
-  sendFriendRequest: "sendFriendRequest",
-  respondFriendRequest: "respondFriendRequest",
-  sendChallenge: "sendChallenge",
-  subscribeMatchmaking: "subscribeMatchmaking",
-  unsubscribeMatchmaking: "unsubscribeMatchmaking",
+  requestGameState: "requestGameState",
+  requestClockSync: "requestClockSync",
+  setPresence: "setPresence",
   // Server → client
   gameState: "gameState",
   moveMade: "moveMade",
@@ -124,19 +107,13 @@ export const SOCKET_EVENTS = {
   playerReconnected: "playerReconnected",
   gameEnded: "gameEnded",
   drawOffered: "drawOffered",
-  drawResolved: "drawResolved",
+  drawAccepted: "drawAccepted",
+  drawRejected: "drawRejected",
   chatMessage: "chatMessage",
-  clockTick: "clockTick",
-  matchmaking: "matchmaking",
-  matchFound: "matchFound",
-  ping: "ping",
-  event: "event",
+  clockUpdate: "clockUpdate",
+  matchmakingMatched: "matchmakingMatched",
+  matchmakingCancelled: "matchmakingCancelled",
+  error: "error",
 } as const;
 
 export type SocketEventName = keyof typeof SOCKET_EVENTS;
-
-export interface GameStatusEvent {
-  gameId: string;
-  status: GameStatus;
-  result: GameResult | null;
-}

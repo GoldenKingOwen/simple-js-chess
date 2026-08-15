@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { gameService } from "@/services/game-service";
 import { connectSocket, onSocket, emitSocket, disconnectSocket, getSocket } from "@/lib/socket/socket-client";
 import { SOCKET_EVENTS } from "@/lib/socket/socket-events";
+import { mapChatMessage, mapGame } from "@/lib/api/adapters";
 import { USE_MOCK_API } from "@/config/env";
 import { MOCK_CURRENT_USER, mockChat } from "@/services/mock/mock-data";
 import { useAuthStore } from "@/stores/auth-store";
@@ -58,14 +59,16 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [opponentGone, setOpponentGone] = useState(false);
 
-  // Load the authoritative game state (REST) on mount.
+  // Load the authoritative game state (REST) on mount, then its move history.
   useEffect(() => {
     let cancelled = false;
     gameService
       .getGame(gameId)
-      .then((value) => {
+      .then(async (value) => {
         if (cancelled) return;
-        setGame(value);
+        const moves = await gameService.getGameMoves(gameId).catch(() => []);
+        if (cancelled) return;
+        setGame({ ...value, moves: moves.map((move) => move.san), moveHistory: moves });
       })
       .catch(() => {
         if (!cancelled) setError("The game you tried to open does not exist (anymore).");
@@ -84,29 +87,34 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
     emitSocket(SOCKET_EVENTS.joinGame, { gameId });
 
     const unsubs = [
-      onSocket(SOCKET_EVENTS.gameState, (payload) => setGame(payload)),
-      onSocket(SOCKET_EVENTS.moveMade, (payload) => setGame(payload.game)),
-      onSocket(SOCKET_EVENTS.gameEnded, (payload) => setGame(payload.game)),
+      onSocket(SOCKET_EVENTS.gameState, (payload) => setGame(mapGame(payload.game))),
+      onSocket(SOCKET_EVENTS.moveMade, (payload) => setGame(mapGame(payload.game))),
+      onSocket(SOCKET_EVENTS.gameEnded, (payload) => setGame(mapGame(payload.game))),
       onSocket(SOCKET_EVENTS.drawOffered, (payload) =>
-        setGame((current) => (current ? { ...current, drawOfferBy: payload.byUserId } : current)),
+        setGame((current) => (current ? { ...current, drawOfferBy: payload.offeredBy } : current)),
       ),
-      onSocket(SOCKET_EVENTS.drawResolved, () =>
+      onSocket(SOCKET_EVENTS.drawAccepted, () =>
         setGame((current) => (current ? { ...current, drawOfferBy: null } : current)),
       ),
-      onSocket(SOCKET_EVENTS.chatMessage, (message) => setChat((messages) => [...messages, message])),
+      onSocket(SOCKET_EVENTS.drawRejected, () =>
+        setGame((current) => (current ? { ...current, drawOfferBy: null } : current)),
+      ),
+      onSocket(SOCKET_EVENTS.chatMessage, (payload) =>
+        setChat((messages) => [...messages, mapChatMessage(payload.message)]),
+      ),
       onSocket(SOCKET_EVENTS.playerDisconnected, (payload) => {
-        if (payload.userId !== selfId) setOpponentGone(true);
+        if (payload.player.userId !== selfId) setOpponentGone(true);
       }),
       onSocket(SOCKET_EVENTS.playerReconnected, (payload) => {
-        if (payload.userId !== selfId) setOpponentGone(false);
+        if (payload.player.userId !== selfId) setOpponentGone(false);
       }),
-      onSocket(SOCKET_EVENTS.clockTick, (payload) =>
+      onSocket(SOCKET_EVENTS.clockUpdate, (payload) =>
         setGame((current) =>
           current
             ? {
                 ...current,
-                white: { ...current.white, clockMs: payload.whiteMs },
-                black: { ...current.black, clockMs: payload.blackMs },
+                white: { ...current.white, clockMs: payload.whiteClockMs },
+                black: { ...current.black, clockMs: payload.blackClockMs },
               }
             : current,
         ),
@@ -151,7 +159,7 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
 
   const respondDraw = useCallback(
     (accept: boolean) => {
-      emitSocket(accept ? SOCKET_EVENTS.acceptDraw : SOCKET_EVENTS.declineDraw, { gameId });
+      emitSocket(SOCKET_EVENTS.respondDraw, { gameId, accept });
       gameService
         .respondDraw(gameId, accept)
         .then(setGame)
@@ -164,7 +172,7 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
     (body: string) => {
       const trimmed = body.trim();
       if (!trimmed) return;
-      emitSocket(SOCKET_EVENTS.sendChatMessage, { gameId, body: trimmed });
+      emitSocket(SOCKET_EVENTS.sendChatMessage, { gameId, message: trimmed });
       if (USE_MOCK_API && getSocket() === null) {
         // Offline/mock: echo the message locally so the UI stays interactive.
         setChat((messages) => [

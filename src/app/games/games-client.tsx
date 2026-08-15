@@ -9,7 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { gameService } from "@/services/game-service";
 import { useAuthStore } from "@/stores/auth-store";
-import { timeControlLabel } from "@/config/time-controls";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | "wins" | "losses" | "draws";
@@ -21,7 +20,7 @@ export function GamesClient() {
 
   const { data: games, isLoading } = useQuery({
     queryKey: ["games", "history", selfId],
-    queryFn: () => gameService.getGames(selfId),
+    queryFn: () => gameService.getGames(user?.username),
     enabled: Boolean(selfId),
   });
 
@@ -117,7 +116,7 @@ export function GamesClient() {
                       <span className="min-w-0 flex-1 truncate">
                         <span className="block text-sm font-medium">vs {opponent.username}</span>
                         <span className="block text-xs text-muted-foreground">
-                          {timeControlLabel(game.timeControl.id)} · {game.rated ? "Rated" : "Casual"}
+                          {game.timeControl.label} · {game.rated ? "Rated" : "Casual"}
                         </span>
                       </span>
                       {game.rated && <Trophy className="h-4 w-4 text-amber-500/70" aria-hidden="true" />}

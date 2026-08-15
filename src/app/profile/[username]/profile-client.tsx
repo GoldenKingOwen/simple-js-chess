@@ -12,7 +12,6 @@ import { RatingChart } from "@/components/profile/rating-chart";
 import { profileService } from "@/services/profile-service";
 import { gameService } from "@/services/game-service";
 import { useAuthStore } from "@/stores/auth-store";
-import { timeControlLabel } from "@/config/time-controls";
 import { cn } from "@/lib/utils";
 
 export function ProfileClient({ username }: { username: string }) {
@@ -24,9 +23,8 @@ export function ProfileClient({ username }: { username: string }) {
   });
 
   const { data: games } = useQuery({
-    queryKey: ["games", "history"],
-    queryFn: () => gameService.getGames(selfId),
-    enabled: Boolean(selfId),
+    queryKey: ["games", "history", username],
+    queryFn: () => gameService.getGames(username),
   });
 
   const recentGames = useMemo(() => {
@@ -176,7 +174,7 @@ export function ProfileClient({ username }: { username: string }) {
                           {won === true ? "Win" : won === false ? "Loss" : "Draw"}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-sm">vs {opponent.username}</span>
-                        <span className="text-xs text-muted-foreground">{timeControlLabel(game.timeControl.id)}</span>
+                        <span className="text-xs text-muted-foreground">{game.timeControl.label}</span>
                       </Link>
                     </li>
                   );
