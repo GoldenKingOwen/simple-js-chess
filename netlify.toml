@@ -1,0 +1,18 @@
+# Netlify build configuration.
+#
+# Next.js 16 requires Node >= 20.9. Pin an explicit version so the build
+# can't fail (or silently use an old image) on Netlify's default Node.
+#
+# Environment variables (NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SOCKET_URL,
+# NEXT_PUBLIC_SOCKET_PATH, NEXT_PUBLIC_USE_MOCK_API=false) must be set in
+# Netlify → Site configuration → Environment variables (scope: Production).
+# They are baked into the bundle at build time — changing them requires a
+# fresh deploy. A production build without NEXT_PUBLIC_API_URL now FAILS
+# on purpose (see src/config/env.ts) instead of shipping mock data.
+
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"

@@ -24,4 +24,18 @@ export const env = {
 export const USE_MOCK_API =
   getEnv("NEXT_PUBLIC_USE_MOCK_API") === "true" || !env.apiUrl;
 
+/**
+ * Production builds must talk to the real backend. Shipping mock mode silently
+ * (e.g. a Netlify build that never received NEXT_PUBLIC_API_URL) makes the app
+ * accept any credentials and show sample data — fail the build loudly instead
+ * of deploying a broken site.
+ */
+if (process.env.NODE_ENV === "production" && USE_MOCK_API) {
+  throw new Error(
+    "Mock mode is enabled in a production build. Set NEXT_PUBLIC_API_URL " +
+      "(and NEXT_PUBLIC_USE_MOCK_API=false) in your Netlify environment " +
+      "variables, then redeploy.",
+  );
+}
+
 export const isDev = process.env.NODE_ENV !== "production";
