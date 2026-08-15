@@ -40,6 +40,14 @@ export const mockAuth: AuthService = {
     await delay(200);
     return MOCK_CURRENT_USER satisfies User;
   },
+  async refresh() {
+    await delay(200);
+    return {
+      user: MOCK_CURRENT_USER,
+      token: FAKE_TOKEN,
+      expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    } satisfies AuthUser;
+  },
   async forgotPassword() {
     await delay();
     return;

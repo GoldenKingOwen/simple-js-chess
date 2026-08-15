@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { useAuthStore } from "@/stores/auth-store";
+import { authService } from "@/services/auth-service";
+import { disconnectSocket } from "@/lib/socket/socket-client";
 
 export function UserMenu() {
   const user = useAuthStore((state) => state.user);
@@ -23,6 +25,9 @@ export function UserMenu() {
   if (!user) return null;
 
   const handleLogout = () => {
+    // Revoke the refresh cookie on the backend, then drop the local session.
+    authService.logout().catch(() => undefined);
+    disconnectSocket();
     logout();
     router.push("/");
   };
