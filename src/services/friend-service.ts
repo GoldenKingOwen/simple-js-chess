@@ -44,26 +44,37 @@ const realFriendService: FriendService = {
   },
 };
 
-function toFriend(item: unknown): Friend {
+export function toFriend(item: unknown): Friend {
   const record = (item ?? {}) as Record<string, unknown>;
-  const user = record.user && typeof record.user === "object" ? (record.user as Record<string, unknown>) : record;
+  // The backend returns { friendshipId, friend: {...}, since } — the friend
+  // object lives under `friend`.
+  const user =
+    record.friend && typeof record.friend === "object"
+      ? (record.friend as Record<string, unknown>)
+      : record.user && typeof record.user === "object"
+        ? (record.user as Record<string, unknown>)
+        : record;
   return {
     user: mapUser(user),
     since: typeof record.since === "string" ? record.since : "",
   };
 }
 
-function toFriendRequest(item: unknown): FriendRequest {
+export function toFriendRequest(item: unknown): FriendRequest {
   const record = (item ?? {}) as Record<string, unknown>;
+  // The backend returns { id, from: {...}, createdAt } — the sender lives
+  // under `from`.
   const sender =
-    record.sender && typeof record.sender === "object"
-      ? (record.sender as Record<string, unknown>)
-      : {
-          id: record.userId,
-          username: record.username,
-          rating: record.rating,
-          avatarUrl: record.avatarUrl,
-        };
+    record.from && typeof record.from === "object"
+      ? (record.from as Record<string, unknown>)
+      : record.sender && typeof record.sender === "object"
+        ? (record.sender as Record<string, unknown>)
+        : {
+            id: record.userId,
+            username: record.username,
+            rating: record.rating,
+            avatarUrl: record.avatarUrl,
+          };
   const statusRaw = String(record.status ?? "pending").toLowerCase();
   const status: FriendRequestStatus =
     statusRaw === "accepted" || statusRaw === "declined" || statusRaw === "cancelled" ? statusRaw : "pending";

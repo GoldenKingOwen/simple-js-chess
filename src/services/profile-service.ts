@@ -36,6 +36,11 @@ const realProfileService: ProfileService = {
     const ratingHistory = historyRaw ? toRatingPoints(historyRaw) : [];
     const user = mapUser(userRaw);
     const stats = toStats(statsRaw ?? {});
+    // /users/:username omits the rating — /profiles/:username carries it.
+    const profileRating = (statsRaw as Record<string, unknown> | null)?.rating;
+    if (typeof profileRating === "number" && Number.isFinite(profileRating)) {
+      user.rating = profileRating;
+    }
     const recentGames = toGameIds(gamesRaw).slice(0, 6);
 
     return {

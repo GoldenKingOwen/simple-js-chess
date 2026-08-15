@@ -47,7 +47,9 @@ function bool(value: unknown, fallback = false): boolean {
 /** Map a backend user (or user-ish object) to the frontend `User` type. */
 export function mapUser(raw: BackendRecord | null | undefined): User {
   const u = raw ?? {};
-  const statusRaw = str(u.status).toLowerCase();
+  // The backend exposes presence as `presence` on public user objects and as
+  // `status` on game players.
+  const statusRaw = str(u.status, u.presence).toLowerCase();
   const status: User["status"] =
     statusRaw === "online" || statusRaw === "in-game" || statusRaw === "offline"
       ? (statusRaw as User["status"])
