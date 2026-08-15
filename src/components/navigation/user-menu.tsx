@@ -68,7 +68,9 @@ export function UserMenu() {
           <Settings className="mr-2 h-4 w-4" aria-hidden="true" /> Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={handleLogout}>
+        {/* Base UI's Menu.Item fires onClick — onSelect is a Radix-ism that
+            never fires here, so the handler must use onClick. */}
+        <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" aria-hidden="true" /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
