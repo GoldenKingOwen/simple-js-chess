@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/app/providers";
 import { AppHeader } from "@/components/navigation/app-header";
+import { MockModeBanner } from "@/components/app/mock-mode-banner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning className="h-full">
       <body className={`${geistSans.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}>
         <Providers>
+          <MockModeBanner />
           <AppHeader />
           <div className="flex flex-1 flex-col">{children}</div>
           <Toaster position="top-center" richColors />

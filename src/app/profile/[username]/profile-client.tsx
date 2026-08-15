@@ -12,14 +12,16 @@ import { RatingChart } from "@/components/profile/rating-chart";
 import { profileService } from "@/services/profile-service";
 import { gameService } from "@/services/game-service";
 import { useAuthStore } from "@/stores/auth-store";
+import { ApiError } from "@/types/api";
 import { cn } from "@/lib/utils";
 
 export function ProfileClient({ username }: { username: string }) {
   const selfId = useAuthStore((state) => state.user?.id);
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading, error } = useQuery({
     queryKey: ["profile", username],
     queryFn: () => profileService.getProfile(username),
+    retry: false,
   });
 
   const { data: games } = useQuery({
@@ -51,10 +53,19 @@ export function ProfileClient({ username }: { username: string }) {
   }
 
   if (!profile) {
+    const isNotFound = error instanceof ApiError && error.statusCode === 404;
+    const detail =
+      isNotFound
+        ? "This profile does not exist or was removed."
+        : error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong while loading this profile. Check your connection and try again.";
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4 text-center">
-        <h1 className="text-xl font-semibold">Player not found</h1>
-        <p className="text-sm text-muted-foreground">This profile does not exist or was removed.</p>
+        <h1 className="text-xl font-semibold">
+          {isNotFound ? "Player not found" : "Couldn't load profile"}
+        </h1>
+        <p className="text-sm text-muted-foreground">{detail}</p>
         <Button variant="outline" render={<Link href="/leaderboard" />}>
           Back to leaderboard
         </Button>
