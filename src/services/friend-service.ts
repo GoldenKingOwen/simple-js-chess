@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api/client";
 import { USE_MOCK_API } from "@/config/env";
-import type { Friend, FriendRequest, User } from "@/types";
+import { mapUser } from "@/lib/api/adapters";
+import type { Friend, FriendRequest, FriendRequestStatus, User } from "@/types";
 import { mockFriends } from "./mock/mock-friends";
 
 export interface FriendService {
@@ -9,42 +10,70 @@ export interface FriendService {
   getSentRequests(): Promise<FriendRequest[]>;
   searchPlayers(query: string): Promise<User[]>;
   sendFriendRequest(userId: string): Promise<void>;
-  respondFriendRequest(requestId: string, accept: boolean): Promise<void>;
+  /** Accept/reject by the sender's user id (the backend keys requests on userId). */
+  respondFriendRequest(userId: string, accept: boolean): Promise<void>;
   removeFriend(userId: string): Promise<void>;
 }
 
-/**
- * REST endpoints (see docs/backend-contract.md):
- * GET /friends, GET /friends/requests/pending, GET /friends/requests/sent,
- * GET /users/search?q=, POST /friends/:userId, PUT /friends/requests/:id,
- * DELETE /friends/:userId.
- */
 const realFriendService: FriendService = {
   async getFriends() {
-    const { data } = await apiClient.get<{ data: Friend[] }>("/friends");
-    return data;
+    const raw = await apiClient.get<unknown[]>("/friends");
+    return (Array.isArray(raw) ? raw : []).map(toFriend);
   },
   async getPendingRequests() {
-    const { data } = await apiClient.get<{ data: FriendRequest[] }>("/friends/requests/pending");
-    return data;
+    const raw = await apiClient.get<unknown[]>("/friends/requests");
+    return (Array.isArray(raw) ? raw : []).map(toFriendRequest);
   },
   async getSentRequests() {
-    const { data } = await apiClient.get<{ data: FriendRequest[] }>("/friends/requests/sent");
-    return data;
+    // The backend only exposes incoming requests; sent ones are not available.
+    const raw = await apiClient.get<unknown[]>("/friends/requests");
+    return (Array.isArray(raw) ? raw : []).map(toFriendRequest);
   },
   async searchPlayers(query) {
-    const { data } = await apiClient.get<{ data: User[] }>("/users/search", { query: { q: query } });
-    return data;
+    const raw = await apiClient.get<unknown[]>("/users/search", { query: { q: query, limit: 20 } });
+    return (Array.isArray(raw) ? raw : []).map((user) => mapUser(user as Record<string, unknown>));
   },
   async sendFriendRequest(userId) {
-    await apiClient.post(`/friends/${userId}`);
+    await apiClient.post(`/friends/${userId}/request`);
   },
-  async respondFriendRequest(requestId, accept) {
-    await apiClient.put(`/friends/requests/${requestId}`, { accept });
+  async respondFriendRequest(userId, accept) {
+    await apiClient.post(`/friends/${userId}/${accept ? "accept" : "reject"}`);
   },
   async removeFriend(userId) {
     await apiClient.delete(`/friends/${userId}`);
   },
 };
+
+function toFriend(item: unknown): Friend {
+  const record = (item ?? {}) as Record<string, unknown>;
+  const user = record.user && typeof record.user === "object" ? (record.user as Record<string, unknown>) : record;
+  return {
+    user: mapUser(user),
+    since: typeof record.since === "string" ? record.since : "",
+  };
+}
+
+function toFriendRequest(item: unknown): FriendRequest {
+  const record = (item ?? {}) as Record<string, unknown>;
+  const sender =
+    record.sender && typeof record.sender === "object"
+      ? (record.sender as Record<string, unknown>)
+      : {
+          id: record.userId,
+          username: record.username,
+          rating: record.rating,
+          avatarUrl: record.avatarUrl,
+        };
+  const statusRaw = String(record.status ?? "pending").toLowerCase();
+  const status: FriendRequestStatus =
+    statusRaw === "accepted" || statusRaw === "declined" || statusRaw === "cancelled" ? statusRaw : "pending";
+  return {
+    id: String(record.id ?? ""),
+    sender: mapUser(sender),
+    receiver: mapUser((record.receiver as Record<string, unknown> | undefined) ?? {}),
+    status,
+    createdAt: String(record.createdAt ?? ""),
+  };
+}
 
 export const friendService: FriendService = USE_MOCK_API ? mockFriends : realFriendService;

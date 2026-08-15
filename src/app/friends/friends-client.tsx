@@ -48,7 +48,7 @@ export function FriendsClient() {
   };
 
   const respondMutation = useMutation({
-    mutationFn: ({ id, accept }: { id: string; accept: boolean }) => friendService.respondFriendRequest(id, accept),
+    mutationFn: ({ userId, accept }: { userId: string; accept: boolean }) => friendService.respondFriendRequest(userId, accept),
     onSuccess: () => {
       toast.success("Request handled");
       invalidate();
@@ -170,7 +170,7 @@ export function FriendsClient() {
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={() => respondMutation.mutate({ id: request.id, accept: true })}
+                        onClick={() => respondMutation.mutate({ userId: request.sender.id, accept: true })}
                         disabled={respondMutation.isPending}
                       >
                         <Check className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Accept
@@ -178,7 +178,7 @@ export function FriendsClient() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => respondMutation.mutate({ id: request.id, accept: false })}
+                        onClick={() => respondMutation.mutate({ userId: request.sender.id, accept: false })}
                         disabled={respondMutation.isPending}
                       >
                         <X className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> Decline
