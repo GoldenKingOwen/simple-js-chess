@@ -17,6 +17,13 @@ interface RequestOptions {
 const isBrowser = typeof window !== "undefined";
 
 /**
+ * API version prefix of the NestJS backend. The backend contract puts every
+ * REST endpoint under `/api/v1` — the client adds it automatically, so
+ * `NEXT_PUBLIC_API_URL` should be the bare host (no prefix).
+ */
+export const API_PREFIX = "/api/v1";
+
+/**
  * Resolve the auth token for requests. Overridden by the auth store at runtime;
  * kept injectable so tests can pass a fixed token.
  */
@@ -101,13 +108,20 @@ export class ApiClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+    // NestJS prefixes every route with /api/v1. Avoid double-prefixing in
+    // case a caller already includes it in the path.
+    const urlPath = path.startsWith(API_PREFIX) ? path : `${API_PREFIX}${path}`;
+
     try {
-      const response = await fetch(`${this.baseUrl}${path}${buildQuery(query)}`, {
+      const response = await fetch(`${this.baseUrl}${urlPath}${buildQuery(query)}`, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: controller.signal,
         cache: "no-store",
+        // Send cookies (the httpOnly refresh-token cookie) on cross-origin
+        // calls to the Render backend from the Netlify frontend.
+        credentials: "include",
       });
 
       if (!response.ok) {
