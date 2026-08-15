@@ -5,15 +5,20 @@
  * read `process.env` directly (which also keeps things testable).
  */
 
-const getEnv = (key: string): string | undefined =>
-  typeof process !== "undefined" ? process.env[key] : undefined;
-
+/**
+ * NOTE: env vars MUST be read with static property access
+ * (`process.env.NEXT_PUBLIC_...`). Next.js only inlines NEXT_PUBLIC_* values
+ * into the client bundle for literal member accesses; a dynamic lookup like
+ * `process.env[key]` is left untouched and evaluates to `undefined` in the
+ * browser, which silently enables mock mode in production regardless of the
+ * variables set at build time.
+ */
 export const env = {
-  /** Base URL of the future NestJS REST API (e.g. https://api.example.com). */
-  apiUrl: getEnv("NEXT_PUBLIC_API_URL"),
-  /** Base URL of the future NestJS Socket.IO gateway. */
-  socketUrl: getEnv("NEXT_PUBLIC_SOCKET_URL") ?? getEnv("NEXT_PUBLIC_API_URL"),
-  socketPath: getEnv("NEXT_PUBLIC_SOCKET_PATH") ?? "/socket.io",
+  /** Base URL of the NestJS REST API (e.g. https://api.example.com). */
+  apiUrl: process.env.NEXT_PUBLIC_API_URL,
+  /** Base URL of the NestJS Socket.IO gateway. */
+  socketUrl: process.env.NEXT_PUBLIC_SOCKET_URL ?? process.env.NEXT_PUBLIC_API_URL,
+  socketPath: process.env.NEXT_PUBLIC_SOCKET_PATH ?? "/socket.io",
 } as const;
 
 /**
@@ -22,7 +27,7 @@ export const env = {
  * the build/profile explicitly opts into mocks for development.
  */
 export const USE_MOCK_API =
-  getEnv("NEXT_PUBLIC_USE_MOCK_API") === "true" || !env.apiUrl;
+  process.env.NEXT_PUBLIC_USE_MOCK_API === "true" || !env.apiUrl;
 
 /**
  * Production builds must talk to the real backend. Shipping mock mode silently
