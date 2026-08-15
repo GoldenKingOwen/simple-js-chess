@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -48,15 +49,17 @@ export function UserMenu() {
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>
-          <div className="flex flex-col">
-            <span className="truncate font-semibold">{user.username}</span>
-            <span className="text-xs font-normal text-muted-foreground">
-              Rating {user.rating}
-              {user.title ? ` · ${user.title}` : ""}
-            </span>
-          </div>
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            <div className="flex flex-col">
+              <span className="truncate font-semibold">{user.username}</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                Rating {user.rating}
+                {user.title ? ` · ${user.title}` : ""}
+              </span>
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href={`/profile/${user.username}`} />}>
           <UserIcon className="mr-2 h-4 w-4" aria-hidden="true" /> Profile
