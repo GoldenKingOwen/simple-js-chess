@@ -23,7 +23,7 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter();
   const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
   const [rememberMe, setRememberMe] = useState(false);
@@ -44,7 +44,7 @@ export function LoginForm() {
       const session = await authService.login({ ...values, rememberMe });
       setAuthenticated(session.user, session.token);
       setSocketAuth(session.token);
-      router.push("/dashboard");
+      router.push(redirectTo ?? "/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
