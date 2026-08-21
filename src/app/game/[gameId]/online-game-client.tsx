@@ -1,19 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GameScreen } from "@/components/game/game-screen";
 import { ConnectionIndicator } from "@/components/navigation/connection-indicator";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { gameService } from "@/services/game-service";
-import { connectSocket, onSocket, emitSocket, disconnectSocket, getSocket } from "@/lib/socket/socket-client";
+import { authService } from "@/services/auth-service";
+import { connectSocket, onSocket, emitSocket, disconnectSocket, getSocket, setSocketAuth } from "@/lib/socket/socket-client";
 import { SOCKET_EVENTS } from "@/lib/socket/socket-events";
 import { mapChatMessage, mapGame } from "@/lib/api/adapters";
 import { USE_MOCK_API } from "@/config/env";
 import { MOCK_CURRENT_USER, mockChat } from "@/services/mock/mock-data";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Game, ChatMessage, GamePlayer } from "@/types";
+import { ApiError } from "@/types";
+import type { Game, ChatMessage, GamePlayer, Move } from "@/types";
 import type { GamePlayerSlot } from "@/stores/game-store";
 import type { EngineMove, Square } from "@/lib/chess/chess-engine";
 import type { BoardInteraction } from "@/components/chess/chess-board";
@@ -48,6 +50,45 @@ function historyToEngineMoves(moves: Game["moveHistory"]): EngineMove[] {
   }));
 }
 
+/**
+ * Rotate the refresh cookie into a fresh access token and retry once when a
+ * request fails with 401 (expired access token mid-session).
+ */
+async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      const session = await authService.refresh();
+      useAuthStore.getState().setAuthenticated(session.user, session.token);
+      setSocketAuth(session.token);
+      return fn();
+    }
+    throw error;
+  }
+}
+
+function describeLoadError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.statusCode === 404) return "This game does not exist.";
+    if (error.statusCode === 401) return "Your session has expired. Please log in again.";
+    if (error.statusCode === 403) return "You are not a player in this game.";
+    if (error.statusCode === 0 || error.statusCode === 408)
+      return "Could not reach the game server. Check your connection and try again.";
+  }
+  return "The game you tried to open does not exist (anymore).";
+}
+
+function describeActionError(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    if (error.statusCode === 401) return "Your session has expired. Please log in again.";
+    if (error.statusCode === 0 || error.statusCode === 408)
+      return "Could not reach the game server. Try again.";
+    if (error.message) return error.message;
+  }
+  return fallback;
+}
+
 export function OnlineGameClient({ gameId }: { gameId: string }) {
   const router = useRouter();
   const authUser = useAuthStore((state) => state.user);
@@ -57,21 +98,45 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
   const [chat, setChat] = useState<ChatMessage[]>(() => (USE_MOCK_API ? mockChat(gameId) : []));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [opponentGone, setOpponentGone] = useState(false);
+  // Flips once the initial load succeeds; socket error events that arrive
+  // earlier are join-room races, not actionable user mistakes.
+  const readyRef = useRef(false);
 
   // Load the authoritative game state (REST) on mount, then its move history.
+  // A 401 is healed by rotating the refresh cookie and retrying once; a 403
+  // on an online game means the visitor is not a player yet (invite link),
+  // so join server-side before giving up.
   useEffect(() => {
     let cancelled = false;
-    gameService
-      .getGame(gameId)
-      .then(async (value) => {
-        if (cancelled) return;
-        const moves = await gameService.getGameMoves(gameId).catch(() => []);
+
+    const load = async (): Promise<{ game: Game; moves: Move[] }> => {
+      let value: Game;
+      try {
+        value = await withAuthRetry(() => gameService.getGame(gameId));
+      } catch (error) {
+        if (error instanceof ApiError && error.statusCode === 403) {
+          value = await withAuthRetry(() => gameService.joinGame(gameId));
+        } else {
+          throw error;
+        }
+      }
+      if (value.status === "waiting" && value.mode === "online" && !value.myColor) {
+        value = await withAuthRetry(() => gameService.joinGame(gameId)).catch(() => value);
+      }
+      const moves = await gameService.getGameMoves(gameId).catch(() => [] as Move[]);
+      return { game: value, moves };
+    };
+
+    load()
+      .then(({ game: value, moves }) => {
         if (cancelled) return;
         setGame({ ...value, moves: moves.map((move) => move.san), moveHistory: moves });
+        readyRef.current = true;
       })
-      .catch(() => {
-        if (!cancelled) setError("The game you tried to open does not exist (anymore).");
+      .catch((err: unknown) => {
+        if (!cancelled) setError(describeLoadError(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -87,8 +152,14 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
     emitSocket(SOCKET_EVENTS.joinGame, { gameId });
 
     const unsubs = [
-      onSocket(SOCKET_EVENTS.gameState, (payload) => setGame(mapGame(payload.game))),
-      onSocket(SOCKET_EVENTS.moveMade, (payload) => setGame(mapGame(payload.game))),
+      onSocket(SOCKET_EVENTS.gameState, (payload) => {
+        setGame(mapGame(payload.game));
+        setActionError(null);
+      }),
+      onSocket(SOCKET_EVENTS.moveMade, (payload) => {
+        setGame(mapGame(payload.game));
+        setActionError(null);
+      }),
       onSocket(SOCKET_EVENTS.gameEnded, (payload) => setGame(mapGame(payload.game))),
       onSocket(SOCKET_EVENTS.drawOffered, (payload) =>
         setGame((current) => (current ? { ...current, drawOfferBy: payload.offeredBy } : current)),
@@ -119,6 +190,14 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
             : current,
         ),
       ),
+      onSocket(SOCKET_EVENTS.error, (payload) => {
+        // The gateway rejects invalid/late actions per-socket (e.g. an
+        // illegal move or "not your turn"). Surface the reason as a banner
+        // instead of silently ignoring it — but only once the game itself
+        // has loaded, so join-room races don't produce phantom errors.
+        if (!readyRef.current) return;
+        setActionError(payload?.message || "Something went wrong. Try again.");
+      }),
     ];
 
     return () => {
@@ -128,42 +207,61 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
     };
   }, [gameId, selfId]);
 
+  // Actions use a single authoritative channel: the socket when it is
+  // connected (the gateway echoes the new state via moveMade/gameState),
+  // otherwise REST. Never both — the backend applies the first copy and the
+  // duplicate is rejected ("not your turn"), which used to surface as a
+  // spurious "move could not be sent" error on a successful move.
   const makeMove = useCallback(
     (from: string, to: string, promotion?: string) => {
-      // Prefer the socket; fall back to REST when the gateway is unavailable
-      // (mock/dev mode). The mock backend stays authoritative either way.
-      getSocket()?.emit(SOCKET_EVENTS.makeMove, { gameId, from, to, promotion });
-      gameService
-        .makeMove(gameId, from, to, promotion)
+      const sock = getSocket();
+      if (sock?.connected) {
+        sock.emit(SOCKET_EVENTS.makeMove, { gameId, from, to, promotion });
+        return;
+      }
+      withAuthRetry(() => gameService.makeMove(gameId, from, to, promotion))
         .then(setGame)
-        .catch(() => setError("That move could not be sent. Try again."));
+        .catch((err: unknown) =>
+          setActionError(describeActionError(err, "That move could not be sent. Try again.")),
+        );
     },
     [gameId],
   );
 
   const resign = useCallback(() => {
-    emitSocket(SOCKET_EVENTS.resignGame, { gameId });
-    gameService
-      .resignGame(gameId)
+    const sock = getSocket();
+    if (sock?.connected) {
+      sock.emit(SOCKET_EVENTS.resignGame, { gameId });
+      return;
+    }
+    withAuthRetry(() => gameService.resignGame(gameId))
       .then(setGame)
-      .catch(() => setError("Unable to resign right now."));
+      .catch((err: unknown) => setActionError(describeActionError(err, "Unable to resign right now.")));
   }, [gameId]);
 
   const offerDraw = useCallback(() => {
-    emitSocket(SOCKET_EVENTS.offerDraw, { gameId });
-    gameService
-      .offerDraw(gameId)
+    const sock = getSocket();
+    if (sock?.connected) {
+      sock.emit(SOCKET_EVENTS.offerDraw, { gameId });
+      return;
+    }
+    withAuthRetry(() => gameService.offerDraw(gameId))
       .then(setGame)
-      .catch(() => setError("Unable to offer a draw right now."));
+      .catch((err: unknown) => setActionError(describeActionError(err, "Unable to offer a draw right now.")));
   }, [gameId]);
 
   const respondDraw = useCallback(
     (accept: boolean) => {
-      emitSocket(SOCKET_EVENTS.respondDraw, { gameId, accept });
-      gameService
-        .respondDraw(gameId, accept)
+      const sock = getSocket();
+      if (sock?.connected) {
+        sock.emit(SOCKET_EVENTS.respondDraw, { gameId, accept });
+        return;
+      }
+      withAuthRetry(() => gameService.respondDraw(gameId, accept))
         .then(setGame)
-        .catch(() => setError("Unable to respond to the draw offer."));
+        .catch((err: unknown) =>
+          setActionError(describeActionError(err, "Unable to respond to the draw offer.")),
+        );
     },
     [gameId],
   );
@@ -253,6 +351,22 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
         <p className="mb-2 rounded-lg bg-amber-500/10 px-3 py-2 text-center text-sm font-medium text-amber-700 dark:text-amber-400" role="status">
           Your opponent disconnected. Waiting for them to return…
         </p>
+      )}
+      {actionError && (
+        <div
+          className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
+          role="alert"
+        >
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label="Dismiss"
+            className="shrink-0 rounded px-1 text-muted-foreground hover:text-foreground"
+          >
+            ✕
+          </button>
+        </div>
       )}
       <GameScreen
         gameId={gameId}
