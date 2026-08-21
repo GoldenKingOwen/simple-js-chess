@@ -32,7 +32,7 @@ const registerSchema = z
 
 type RegisterValues = z.infer<typeof registerSchema>;
 
-export function RegisterForm() {
+export function RegisterForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter();
   const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function RegisterForm() {
       });
       setAuthenticated(session.user, session.token);
       setSocketAuth(session.token);
-      router.push("/dashboard");
+      router.push(redirectTo ?? "/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
