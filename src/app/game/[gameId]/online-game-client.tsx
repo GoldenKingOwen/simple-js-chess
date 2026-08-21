@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { GameScreen } from "@/components/game/game-screen";
 import { ConnectionIndicator } from "@/components/navigation/connection-indicator";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,7 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [needsAuth, setNeedsAuth] = useState(false);
   const [opponentGone, setOpponentGone] = useState(false);
   // Flips once the initial load succeeds; socket error events that arrive
   // earlier are join-room races, not actionable user mistakes.
@@ -107,11 +109,16 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
   // Load the authoritative game state (REST) on mount, then its move history.
   // A 401 is healed by rotating the refresh cookie and retrying once; a 403
   // on an online game means the visitor is not a player yet (invite link),
-  // so join server-side before giving up.
+  // so join server-side before giving up. Visitors without a session skip
+  // straight to the log-in screen — joining requires an account.
   useEffect(() => {
     let cancelled = false;
 
     const load = async (): Promise<{ game: Game; moves: Move[] }> => {
+      const hasSession = USE_MOCK_API || Boolean(useAuthStore.getState().token);
+      if (!hasSession) {
+        throw new ApiError("No session", 401);
+      }
       let value: Game;
       try {
         value = await withAuthRetry(() => gameService.getGame(gameId));
@@ -136,7 +143,19 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
         readyRef.current = true;
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(describeLoadError(err));
+        if (cancelled) return;
+        if (err instanceof ApiError && err.statusCode === 401) {
+          setNeedsAuth(true);
+          // Distinguish "never logged in on this device" from a session that
+          // expired despite a refresh-cookie attempt.
+          setError(
+            useAuthStore.getState().token
+              ? "Your session has expired. Please log in again."
+              : "You need an account to join this game. Log in or register, and you'll be brought right back here.",
+          );
+        } else {
+          setError(describeLoadError(err));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -316,6 +335,9 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
   }
 
   if (error) {
+    const gamePath = `/game/${gameId}`;
+    const loginHref = `/login?redirect=${encodeURIComponent(gamePath)}`;
+    const registerHref = `/register?redirect=${encodeURIComponent(gamePath)}`;
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
         <div className="rounded-full bg-destructive/10 p-4 text-destructive" aria-hidden="true">
@@ -325,11 +347,20 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
             <path d="M12 16h.01" strokeLinecap="round" />
           </svg>
         </div>
-        <h1 className="text-xl font-semibold">Game unavailable</h1>
+        <h1 className="text-xl font-semibold">{needsAuth ? "Log in to join" : "Game unavailable"}</h1>
         <p className="max-w-sm text-sm text-muted-foreground">{error}</p>
-        <Button variant="outline" onClick={() => router.push("/play/online")}>
-          Back to lobby
-        </Button>
+        {needsAuth ? (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button render={<Link href={loginHref} />}>Log in</Button>
+            <Button variant="outline" render={<Link href={registerHref} />}>
+              Create account
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" onClick={() => router.push("/play/online")}>
+            Back to lobby
+          </Button>
+        )}
       </div>
     );
   }
