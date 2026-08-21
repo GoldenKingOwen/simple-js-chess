@@ -38,7 +38,12 @@ export function Providers({ children }: { children: ReactNode }) {
       authService
         .me()
         .then((user) => {
-          if (!cancelled) useAuthStore.getState().setUser(user);
+          if (!cancelled) {
+            // Mark the restored session authenticated — the rotation loop
+            // below skips anything else, and "idle" would silently kill it.
+            useAuthStore.getState().setUser(user);
+            useAuthStore.getState().setStatus("authenticated");
+          }
         })
         .catch(async () => {
           if (cancelled) return;
@@ -68,8 +73,11 @@ export function Providers({ children }: { children: ReactNode }) {
     let inFlight = false;
 
     const rotate = async (): Promise<void> => {
-      const { token, status } = useAuthStore.getState();
-      if (!token || status !== "authenticated" || inFlight) return;
+      const { token } = useAuthStore.getState();
+      // Deliberately not gated on `status`: after a reload the persisted
+      // store has a token but status "idle", and skipping rotation here is
+      // what let access tokens expire mid-game (every REST call 401s).
+      if (!token || inFlight) return;
       inFlight = true;
       try {
         const session = await authService.refresh();
