@@ -8,7 +8,10 @@ How the Next.js frontend is organised and how data flows through it.
 /                     → redirects to /dashboard
 /play                 → hub (quick play, play the bot, local game, create private game)
 /play/local           → local two-player setup + game (same board)
-/play/bot             → bot game setup (difficulty / color / time control)
+/play/bot             → bot game setup; starts a persisted server-side GameMode.BOT
+                        game (real Stockfish) at /game/[gameId], or — with "Practice
+                        mode" on — an offline client-bot game
+
 /play/online          → online lobby: quick matchmaking, create, join tabs
 /game/[gameId]        → live online game screen (socket + REST fallback)
 /login /register /forgot-password
@@ -62,8 +65,9 @@ invalidate their keys so lists stay in sync.
 board renderer; `bot.ts` provides `LocalChessBot(difficulty, color)` which
 returns a SAN via `getMove(fen)` with `botThinkDelay`.
 
-`useChessGame` (`src/hooks/use-chess-game.ts`) is the engine of **local and bot
-games**. It owns:
+`useChessGame` (`src/hooks/use-chess-game.ts`) is the engine of **local games and
+the offline "practice" bot** (a real `GameMode.BOT` game runs server-side through
+the online game screen — see Routes). It owns:
 
 - the engine **instance** (stable `useState`, never swapped),
 - **moves / fen / turn / lastMove / check** sync,
@@ -87,7 +91,7 @@ controls (`game-controls.tsx`). It is a **controlled** component — the parent
 hands it `fen`, `moves`, clocks, callbacks (`onMove`, `onResign`, …) and an
 `interaction` mode (`play | white-only | black-only | spectator`).
 
-- **Local/bot** pages drive it from `useChessGame`.
+- **Local** and **practice-bot** pages drive it from `useChessGame`.
 - **Online** (`game/[gameId]/online-game-client.tsx`) drives it from the
   socket/REST game state; the backend is authoritative and only client-side
   cosmetics (clocks, banners) are adjusted locally.
