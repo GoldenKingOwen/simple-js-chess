@@ -30,6 +30,8 @@ interface GameScreenProps {
   status: "playing" | "ended";
   result: GameResult | null;
   checkSquare: Square | null;
+  /** Live-updating ECO opening label; shown near the move list. */
+  opening?: { eco: string; name: string } | null;
   botThinking?: boolean;
   drawOffered?: boolean;
   drawReceived?: boolean;
@@ -81,6 +83,7 @@ export function GameScreen({
   interaction,
   status,
   result,
+  opening,
   botThinking,
   drawOffered,
   drawReceived,
@@ -186,6 +189,7 @@ export function GameScreen({
               onSelectMove={replay?.onSelectMove}
               gameId={gameId}
               chat={chat}
+              opening={opening}
               defaultTab={chat ? "moves" : "moves"}
               className="h-full p-2"
             />
@@ -201,6 +205,7 @@ export function GameScreen({
           onSelectMove={replay?.onSelectMove}
           gameId={gameId}
           chat={chat}
+          opening={opening}
           className="h-full p-2"
         />
       </div>

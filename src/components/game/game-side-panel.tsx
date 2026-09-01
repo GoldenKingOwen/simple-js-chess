@@ -22,6 +22,8 @@ interface GameSidePanelProps {
     connecting?: boolean;
   };
   defaultTab?: "moves" | "chat" | "notes";
+  /** Live-updating ECO opening label rendered above the tabs. */
+  opening?: { eco: string; name: string } | null;
   className?: string;
 }
 
@@ -35,11 +37,22 @@ export function GameSidePanel({
   onSelectMove,
   gameId,
   chat,
+  opening,
   defaultTab = "moves",
   className,
 }: GameSidePanelProps) {
   return (
     <Tabs defaultValue={defaultTab} className={className}>
+      {opening && (
+        <p
+          className="mb-1 truncate px-1 text-xs text-muted-foreground"
+          title={`${opening.name} (${opening.eco})`}
+          data-testid="opening-label"
+        >
+          <span className="font-medium text-foreground">{opening.name}</span>{" "}
+          <span className="tabular-nums">({opening.eco})</span>
+        </p>
+      )}
       <TabsList className="w-full">
         <TabsTrigger value="moves" className="flex-1">Moves</TabsTrigger>
         <TabsTrigger value="chat" className="flex-1">Chat</TabsTrigger>

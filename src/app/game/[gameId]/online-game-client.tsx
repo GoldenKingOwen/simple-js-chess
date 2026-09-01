@@ -179,6 +179,13 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
         setGame(mapGame(payload.game));
         setActionError(null);
       }),
+      onSocket(SOCKET_EVENTS.openingRecognized, (payload) =>
+        setGame((current) =>
+          current
+            ? { ...current, opening: { eco: payload.eco, name: payload.name, ply: payload.matchedPly } }
+            : current,
+        ),
+      ),
       onSocket(SOCKET_EVENTS.gameEnded, (payload) => setGame(mapGame(payload.game))),
       onSocket(SOCKET_EVENTS.drawOffered, (payload) =>
         setGame((current) => (current ? { ...current, drawOfferBy: payload.offeredBy } : current)),
@@ -414,6 +421,7 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
         status={status}
         result={game.result}
         checkSquare={null}
+        opening={game.opening ?? null}
         drawOffered={game.drawOfferBy === game.white.user.id}
         drawReceived={Boolean(game.drawOfferBy) && game.drawOfferBy !== game.white.user.id}
         onMove={(move) => makeMove(move.from, move.to, move.promotion)}

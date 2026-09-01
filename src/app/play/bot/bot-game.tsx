@@ -279,6 +279,7 @@ function BotMatch({ config }: { config: BotConfig }) {
         status={game.status}
         result={game.result}
         checkSquare={game.checkSquare}
+        opening={game.opening}
         botThinking={game.botThinking}
         drawOffered={game.drawOfferedBy === config.playerColor}
         drawReceived={game.drawOfferedBy !== null && game.drawOfferedBy !== config.playerColor}

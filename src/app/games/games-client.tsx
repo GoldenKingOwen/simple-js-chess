@@ -118,6 +118,11 @@ export function GamesClient() {
                         <span className="block text-xs text-muted-foreground">
                           {game.timeControl.label} · {game.rated ? "Rated" : "Casual"}
                         </span>
+                        {game.opening?.name && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {game.opening.name}
+                          </span>
+                        )}
                       </span>
                       {game.rated && <Trophy className="h-4 w-4 text-amber-500/70" aria-hidden="true" />}
                       <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
