@@ -98,6 +98,7 @@ export function ReplayClient({ gameId }: { gameId: string }) {
       <div className="mb-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           Replay · {game.rated ? "Rated" : "Casual"} · {game.timeControl.label} · {resultText}
+          {game.opening?.name ? ` · ${game.opening.name} (${game.opening.eco})` : ""}
         </p>
         <h1 className="text-xl font-bold">
           {game.white.user.username} vs {game.black.user.username}

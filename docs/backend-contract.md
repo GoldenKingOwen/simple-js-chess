@@ -127,6 +127,7 @@ Typed in `src/types/socket.ts`; names must stay in sync.
 | --------------------- | ----------------------------------------- |
 | `gameState`           | `Game` (full authoritative state)         |
 | `moveMade`            | `{ game, move }`                          |
+| `openingRecognized`   | `{ gameId, eco, name, matchedPly }` — emitted only when the matched ECO opening changes (ONLINE/BOT); never cleared once matched |
 | `gameEnded`           | `{ gameId, result, game }`                |
 | `playerJoined`        | `{ gameId, userId, username }`            |
 | `playerDisconnected`  | `{ gameId, userId }`                      |
@@ -156,6 +157,7 @@ Typed in `src/types/socket.ts`; names must stay in sync.
   currentPlayerColor, // "w" | "b"
   drawOfferBy,    // userId | null
   result,         // GameResult | null
+  opening,        // { eco, name, ply } | null — persisted best-known ECO opening
   pgn,            // string
 }
 ```
