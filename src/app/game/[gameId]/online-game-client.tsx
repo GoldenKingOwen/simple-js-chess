@@ -406,6 +406,7 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
         whiteMs={game.white.clockMs}
         blackMs={game.black.clockMs}
         activeClock={game.status === "active" ? game.currentPlayerColor : null}
+        untimed={game.timeControl.timeMs === 0}
         fen={game.position}
         moves={moves}
         turn={game.currentPlayerColor}

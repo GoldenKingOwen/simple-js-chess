@@ -9,6 +9,8 @@ interface PlayerPanelProps {
   slot: GamePlayerSlot;
   active: boolean;
   timeMs: number;
+  /** Hide the clock entirely (untimed games). */
+  untimed?: boolean;
   /** Show a "to move" indicator. */
   showTurn?: boolean;
   /** Extra content shown on the right (e.g. captured pieces). */
@@ -20,7 +22,7 @@ interface PlayerPanelProps {
  * A player row: avatar, username, rating/title, online dot and clock.
  * Used above and below the board.
  */
-export function PlayerPanel({ slot, active, timeMs, showTurn = true, right, className }: PlayerPanelProps) {
+export function PlayerPanel({ slot, active, timeMs, untimed = false, showTurn = true, right, className }: PlayerPanelProps) {
   return (
     <div
       className={cn(
@@ -47,7 +49,16 @@ export function PlayerPanel({ slot, active, timeMs, showTurn = true, right, clas
         </div>
       </div>
       {right}
-      <Clock timeMs={timeMs} active={active} color={slot.color} />
+      {untimed ? (
+        <span
+          className="rounded-lg border border-transparent bg-muted/40 px-3 py-1.5 font-mono text-sm text-muted-foreground tabular-nums sm:text-base"
+          aria-label={`${slot.color === "w" ? "White" : "Black"} clock: untimed`}
+        >
+          ∞
+        </span>
+      ) : (
+        <Clock timeMs={timeMs} active={active} color={slot.color} />
+      )}
     </div>
   );
 }
