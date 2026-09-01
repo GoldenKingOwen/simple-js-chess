@@ -31,6 +31,7 @@ interface BotConfig {
   difficulty: BotDifficulty;
   playerColor: Color;
   timeControlId: TimeControlId;
+  noClock: boolean;
 }
 
 export function BotGame() {
@@ -45,12 +46,13 @@ export function BotGame() {
   // authoritative backend (Stockfish). Practice = the offline client bot; it is
   // never saved and does not touch your rating.
   const [practice, setPractice] = useState(false);
+  const [noClock, setNoClock] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const startGame = useCallback(async () => {
     if (practice) {
-      setConfig({ difficulty, playerColor, timeControlId });
+      setConfig({ difficulty, playerColor, timeControlId, noClock });
       return;
     }
     if (!isAuthed) {
@@ -63,6 +65,7 @@ export function BotGame() {
       const game = await gameService.createGame({
         mode: "bot",
         timeControlId,
+        timeControl: noClock ? "unlimited" : undefined,
         rated: false,
         colorPreference: playerColor,
         botDifficulty: difficulty,
@@ -72,7 +75,7 @@ export function BotGame() {
       setCreateError("Could not start the bot game. Check your connection and try again.");
       setCreating(false);
     }
-  }, [practice, isAuthed, difficulty, playerColor, timeControlId, router]);
+  }, [practice, noClock, isAuthed, difficulty, playerColor, timeControlId, router]);
 
   if (!config) {
     return (
@@ -132,8 +135,9 @@ export function BotGame() {
                 <select
                   id="tc"
                   value={timeControlId}
+                  disabled={noClock}
                   onChange={(event) => setTimeControlId(event.target.value as TimeControlId)}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {TIME_CONTROL_LIST.map((tc) => (
                     <option key={tc.id} value={tc.id}>
@@ -141,6 +145,18 @@ export function BotGame() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="flex items-start justify-between gap-4 rounded-lg border px-3 py-2.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="no-clock" className="font-medium">
+                    No clock
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Play without a time control — take as long as you like on every move.
+                  </p>
+                </div>
+                <Switch id="no-clock" checked={noClock} onCheckedChange={setNoClock} aria-label="No clock" />
               </div>
 
               <div className="flex items-start justify-between gap-4 rounded-lg border px-3 py-2.5">
@@ -186,7 +202,12 @@ export function BotGame() {
     );
   }
 
-  return <BotMatch key={`${config.difficulty}-${config.playerColor}-${config.timeControlId}`} config={config} />;
+  return (
+    <BotMatch
+      key={`${config.difficulty}-${config.playerColor}-${config.timeControlId}-${config.noClock}`}
+      config={config}
+    />
+  );
 }
 
 /**
@@ -196,7 +217,10 @@ export function BotGame() {
 function BotMatch({ config }: { config: BotConfig }) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const timeControl = getTimeControl(config.timeControlId);
+  const baseTimeControl = getTimeControl(config.timeControlId);
+  const timeControl = config.noClock
+    ? { ...baseTimeControl, label: "Unlimited", timeMs: 0, incrementMs: 0 }
+    : baseTimeControl;
   const botColor: Color = config.playerColor === "w" ? "b" : "w";
   const difficulty = DIFFICULTIES.find((level) => level.id === config.difficulty)!;
   const bot = new LocalChessBot(config.difficulty, botColor);
@@ -247,6 +271,7 @@ function BotMatch({ config }: { config: BotConfig }) {
         whiteMs={game.whiteMs}
         blackMs={game.blackMs}
         activeClock={game.activeClock}
+        untimed={config.noClock}
         fen={game.fen}
         moves={game.moves}
         turn={game.turn}
