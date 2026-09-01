@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "openings:generate": "node scripts/generate-openings-book.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
