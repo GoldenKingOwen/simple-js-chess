@@ -2,43 +2,77 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bot, Play } from "lucide-react";
+import { ArrowLeft, Bot, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { GameScreen } from "@/components/game/game-screen";
 import { useChessGame } from "@/hooks/use-chess-game";
 import { LocalChessBot, botName } from "@/lib/chess/bot";
+import { gameService } from "@/services/game-service";
+import { useAuthStore } from "@/stores/auth-store";
 import { getTimeControl, TIME_CONTROL_LIST, timeControlLabel } from "@/config/time-controls";
 import type { Color } from "@/lib/chess/chess-engine";
-import type { BotDifficulty } from "@/types";
+import type { BotDifficulty, TimeControlId } from "@/types";
 import type { GamePlayerSlot } from "@/stores/game-store";
-import { useAuthStore } from "@/stores/auth-store";
 import { sounds } from "@/lib/sound/sound-manager";
 
 const DIFFICULTIES: { id: BotDifficulty; label: string; hint: string; rating: number }[] = [
-  { id: "beginner", label: "Beginner", hint: "Makes random moves", rating: 400 },
+  { id: "beginner", label: "Beginner", hint: "Barely thinks", rating: 400 },
   { id: "easy", label: "Easy", hint: "Good for warm-ups", rating: 800 },
   { id: "medium", label: "Medium", hint: "A solid club player", rating: 1200 },
   { id: "hard", label: "Hard", hint: "Fights for every point", rating: 1600 },
-  { id: "expert", label: "Expert", hint: "Near-perfect play", rating: 2000 },
+  { id: "expert", label: "Expert", hint: "Full-strength Stockfish", rating: 2000 },
 ];
 
 interface BotConfig {
   difficulty: BotDifficulty;
   playerColor: Color;
-  timeControlId: "bullet" | "blitz" | "rapid" | "classical" | "casual";
+  timeControlId: TimeControlId;
 }
 
 export function BotGame() {
   const router = useRouter();
+  const isAuthed = useAuthStore((state) => Boolean(state.token));
+
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [difficulty, setDifficulty] = useState<BotDifficulty>("medium");
   const [playerColor, setPlayerColor] = useState<Color>("w");
-  const [timeControlId, setTimeControlId] = useState<BotConfig["timeControlId"]>("rapid");
+  const [timeControlId, setTimeControlId] = useState<TimeControlId>("rapid");
+  // Server bot = a real, persisted GameMode.BOT game played through the
+  // authoritative backend (Stockfish). Practice = the offline client bot; it is
+  // never saved and does not touch your rating.
+  const [practice, setPractice] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  const startGame = () => setConfig({ difficulty, playerColor, timeControlId });
+  const startGame = useCallback(async () => {
+    if (practice) {
+      setConfig({ difficulty, playerColor, timeControlId });
+      return;
+    }
+    if (!isAuthed) {
+      router.push(`/login?redirect=${encodeURIComponent("/play/bot")}`);
+      return;
+    }
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const game = await gameService.createGame({
+        mode: "bot",
+        timeControlId,
+        rated: false,
+        colorPreference: playerColor,
+        botDifficulty: difficulty,
+      });
+      router.push(`/game/${game.id}`);
+    } catch {
+      setCreateError("Could not start the bot game. Check your connection and try again.");
+      setCreating(false);
+    }
+  }, [practice, isAuthed, difficulty, playerColor, timeControlId, router]);
 
   if (!config) {
     return (
@@ -98,7 +132,7 @@ export function BotGame() {
                 <select
                   id="tc"
                   value={timeControlId}
-                  onChange={(event) => setTimeControlId(event.target.value as BotConfig["timeControlId"])}
+                  onChange={(event) => setTimeControlId(event.target.value as TimeControlId)}
                   className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {TIME_CONTROL_LIST.map((tc) => (
@@ -109,8 +143,41 @@ export function BotGame() {
                 </select>
               </div>
 
-              <Button type="button" size="lg" className="w-full" onClick={startGame}>
-                <Play className="mr-2 h-4 w-4" aria-hidden="true" /> Start bot game
+              <div className="flex items-start justify-between gap-4 rounded-lg border px-3 py-2.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="practice-mode" className="font-medium">
+                    Practice mode
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Play offline against the lightweight local bot. Nothing is saved. Turn this
+                    off for a real game against server-side Stockfish.
+                  </p>
+                </div>
+                <Switch
+                  id="practice-mode"
+                  checked={practice}
+                  onCheckedChange={setPractice}
+                  aria-label="Practice mode"
+                />
+              </div>
+
+              {createError && (
+                <p className="text-sm font-medium text-destructive" role="alert">
+                  {createError}
+                </p>
+              )}
+
+              <Button type="button" size="lg" className="w-full" onClick={startGame} disabled={creating}>
+                {creating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> Starting…
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" aria-hidden="true" />
+                    {practice ? "Start practice game" : "Start bot game"}
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>
@@ -122,6 +189,10 @@ export function BotGame() {
   return <BotMatch key={`${config.difficulty}-${config.playerColor}-${config.timeControlId}`} config={config} />;
 }
 
+/**
+ * Offline "practice" match against {@link LocalChessBot}. The real, persisted bot
+ * game is the online game screen at `/game/:id` — see {@link BotGame}.
+ */
 function BotMatch({ config }: { config: BotConfig }) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
@@ -154,7 +225,7 @@ function BotMatch({ config }: { config: BotConfig }) {
   };
   const botSlot: GamePlayerSlot = {
     user: null,
-    username: botName(config.difficulty),
+    username: `${botName(config.difficulty)} (practice)`,
     avatarUrl: null,
     rating: difficulty.rating,
     title: null,
