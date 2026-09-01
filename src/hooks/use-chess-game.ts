@@ -6,6 +6,8 @@ import type { Color, EngineMove, PieceSymbol, Square } from "@/lib/chess/chess-e
 import type { GameResult, TimeControl, BotDifficulty } from "@/types";
 import type { ChessBot } from "@/lib/chess/bot";
 import { botThinkDelay } from "@/lib/chess/bot";
+import { detectOpening } from "@/lib/chess/openings/opening-detector";
+import type { OpeningMatch } from "@/lib/chess/openings/opening-detector";
 
 export type ChessGameStatus = "playing" | "ended";
 
@@ -37,6 +39,8 @@ export interface ChessGameApi {
   activeClock: Color | null;
   botThinking: boolean;
   drawOfferedBy: Color | null;
+  /** Deepest recognized ECO opening so far; frozen on the last match once out of book. */
+  opening: OpeningMatch | null;
   makeMove: (from: Square, to: Square, promotion?: PieceSymbol) => void;
   resign: () => void;
   offerDraw: () => void;
@@ -79,6 +83,21 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
   const [blackMs, setBlackMs] = useState(timeControl.timeMs);
   const [botThinking, setBotThinking] = useState(false);
   const [drawOfferedBy, setDrawOfferedBy] = useState<Color | null>(null);
+  const [opening, setOpening] = useState<OpeningMatch | null>(null);
+
+  /**
+   * Recompute the opening from the current SAN list. A non-null match replaces
+   * the previous one only when it actually changed; a null (out of book) keeps
+   * the last confident match. `reset` (takeback / new game) allows clearing.
+   */
+  const updateOpening = useCallback((sanList: string[], reset = false) => {
+    const match = detectOpening(sanList);
+    setOpening((prev) => {
+      if (!match) return reset ? null : prev;
+      if (prev && prev.eco === match.eco && prev.name === match.name) return prev;
+      return match;
+    });
+  }, []);
 
   const botColorRef = useRef(botColor);
   const botRef = useRef(bot);
@@ -158,6 +177,7 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
 
       movesRef.current = [...movesRef.current, move];
       setMoves(movesRef.current);
+      updateOpening(movesRef.current.map((m) => m.san));
       setLastMove({ from: move.from, to: move.to });
       setFen(engine.fen());
       setTurn(engine.turn());
@@ -191,7 +211,7 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
       // Trigger the bot when it is its turn.
       triggerBot();
     },
-    [finishGame, engine, timeControl.incrementMs, triggerBot],
+    [finishGame, engine, timeControl.incrementMs, triggerBot, updateOpening],
   );
 
   // Latest callback identity for the bot reply loop.
@@ -280,13 +300,14 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
     const history = engine.history();
     setMoves(history);
     movesRef.current = history;
+    updateOpening(history.map((m) => m.san), true);
     setFen(engine.fen());
     setTurn(engine.turn());
     setLastMove(history.length > 0 ? { from: history[history.length - 1].from, to: history[history.length - 1].to } : null);
     setDrawOfferedBy(null);
     activeClockRef.current = engine.turn();
     lastTickRef.current = performance.now();
-  }, [engine]);
+  }, [engine, updateOpening]);
 
   const newGame = useCallback(() => {
     engine.reset();
@@ -305,6 +326,7 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
     setCheckSquare(null);
     setDrawOfferedBy(null);
     setBotThinking(false);
+    setOpening(null);
     syncClockState();
   }, [engine, timeControl.timeMs, syncClockState]);
 
@@ -325,6 +347,7 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
     activeClock,
     botThinking,
     drawOfferedBy,
+    opening,
     makeMove,
     resign,
     offerDraw,

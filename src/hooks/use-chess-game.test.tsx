@@ -62,3 +62,22 @@ describe("useChessGame (bot mode)", () => {
     expect(result.current.turn).toBe("w");
   });
 });
+
+describe("useChessGame (opening recognition)", () => {
+  it("recognizes the opening live and keeps the last match after leaving book", () => {
+    const { result } = renderHook(() => useChessGame({ mode: "local", timeControl }));
+
+    expect(result.current.opening).toBeNull();
+
+    act(() => result.current.makeMove("c2", "c4"));
+    expect(result.current.opening?.name).toContain("English");
+
+    act(() => result.current.makeMove("e7", "e5"));
+    expect(result.current.opening?.name).toContain("English");
+    expect(result.current.opening?.matchedPly).toBe(2);
+
+    // A divergent move leaves book — the last confident match is kept, not cleared.
+    act(() => result.current.makeMove("d1", "a4"));
+    expect(result.current.opening?.name).toContain("English");
+  });
+});

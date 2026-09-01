@@ -197,7 +197,19 @@ export function mapGame(raw: BackendRecord | null | undefined): Game {
     viewers: num(g.viewers, 0),
     currentPlayerColor: currentTurnRaw === "BLACK" ? "b" : "w",
     myColor: myColorRaw === "WHITE" ? "w" : myColorRaw === "BLACK" ? "b" : undefined,
+    opening: mapOpening(g),
   };
+}
+
+/**
+ * Opening comes nested as `opening: { eco, name, ply }` from the game serializer,
+ * or flat as `openingEco` / `openingName` from the `/users/:username/games` list.
+ */
+export function mapOpening(g: BackendRecord): { eco: string; name: string; ply: number } | null {
+  const nested = g.opening && typeof g.opening === "object" ? (g.opening as BackendRecord) : null;
+  const name = str(nested?.name, g.openingName);
+  if (!name) return null;
+  return { eco: str(nested?.eco, g.openingEco), name, ply: num(nested?.ply ?? g.openingPly) };
 }
 
 /** Map a backend move record (SAN/UCI/FEN) to the frontend `Move` type. */
