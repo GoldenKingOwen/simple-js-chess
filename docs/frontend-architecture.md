@@ -8,9 +8,10 @@ How the Next.js frontend is organised and how data flows through it.
 /                     → redirects to /dashboard
 /play                 → hub (quick play, play the bot, local game, create private game)
 /play/local           → local two-player setup + game (same board)
-/play/bot             → bot game setup; starts a persisted server-side GameMode.BOT
-                        game (real Stockfish) at /game/[gameId], or — with "Practice
-                        mode" on — an offline client-bot game
+/play/bot             → bot game setup (difficulty / color / time control, or
+                        "No clock" for untimed); starts a persisted server-side
+                        GameMode.BOT game (real Stockfish) at /game/[gameId], or —
+                        with "Practice mode" on — an offline client-bot game
 
 /play/online          → online lobby: quick matchmaking, create, join tabs
 /game/[gameId]        → live online game screen (socket + REST fallback)

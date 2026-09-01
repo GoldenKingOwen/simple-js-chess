@@ -53,6 +53,10 @@ export interface ChessGameApi {
 export function useChessGame(options: UseChessGameOptions): ChessGameApi {
   const { timeControl, bot, botColor = "b", initialFen, onGameOver, onBotMove } = options;
 
+  // Untimed game: clocks don't run and the game never ends on time.
+  const untimed = timeControl.timeMs <= 0;
+  const untimedRef = useRef(untimed);
+
   // The engine instance never changes identity for the life of the hook.
   const [engine] = useState(() => (initialFen ? new ChessEngine(initialFen) : new ChessEngine()));
 
@@ -88,6 +92,7 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
     botRef.current = bot;
     onBotMoveRef.current = onBotMove;
     onGameOverRef.current = onGameOver;
+    untimedRef.current = untimed;
   });
 
   const syncClockState = useCallback(() => {
@@ -143,10 +148,12 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
       if (statusRef.current !== "playing") return;
 
       // Increment for the mover's clock.
-      if (move.color === "w") {
-        whiteMsRef.current += timeControl.incrementMs;
-      } else {
-        blackMsRef.current += timeControl.incrementMs;
+      if (!untimedRef.current) {
+        if (move.color === "w") {
+          whiteMsRef.current += timeControl.incrementMs;
+        } else {
+          blackMsRef.current += timeControl.incrementMs;
+        }
       }
 
       movesRef.current = [...movesRef.current, move];
@@ -201,6 +208,7 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
 
   // Clock interval.
   useEffect(() => {
+    if (untimed) return; // no clocks to run
     lastTickRef.current = performance.now();
     const interval = window.setInterval(() => {
       const now = performance.now();
@@ -227,7 +235,7 @@ export function useChessGame(options: UseChessGameOptions): ChessGameApi {
     }, 250);
 
     return () => window.clearInterval(interval);
-  }, [finishGame, syncClockState]);
+  }, [finishGame, syncClockState, untimed]);
 
   const makeMove = useCallback(
     (from: Square, to: Square, promotion?: PieceSymbol) => {

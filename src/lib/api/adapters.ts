@@ -96,6 +96,10 @@ function mapPlayer(raw: BackendRecord | null | undefined, color: GameColor, empt
  */
 export function mapTimeControl(value: unknown): TimeControl {
   const raw = str(value, "10+0");
+  if (raw.trim().toLowerCase() === "unlimited") {
+    // timeMs === 0 is the frontend's "untimed" marker (see game-screen).
+    return { id: "casual", label: "Unlimited", timeMs: 0, incrementMs: 0 };
+  }
   const [initialRaw, incrementRaw] = raw.split("+");
   const initialMin = num(initialRaw.trim(), 10);
   const incrementSec = num((incrementRaw ?? "0").trim(), 0);
@@ -277,7 +281,7 @@ export function toBackendGameInput(input: CreateGameInput): BackendRecord {
       : "RANDOM";
   return {
     mode: GAME_MODE_TO_BACKEND[input.mode] ?? "ONLINE",
-    timeControl: toBackendTimeControl(input.timeControlId),
+    timeControl: input.timeControl ?? toBackendTimeControl(input.timeControlId),
     rated: input.rated ?? false,
     colorPreference,
     isPrivate: Boolean(input.inviteeId),

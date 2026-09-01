@@ -107,6 +107,8 @@ export interface GameOverInfo {
 export interface CreateGameInput {
   mode: GameMode;
   timeControlId: TimeControlId;
+  /** Raw backend time-control string, overrides `timeControlId` (e.g. "unlimited"). */
+  timeControl?: string;
   rated: boolean;
   colorPreference?: GameColor | "random";
   inviteeId?: string | null;

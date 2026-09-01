@@ -21,6 +21,8 @@ interface GameScreenProps {
   whiteMs: number;
   blackMs: number;
   activeClock: Color | null;
+  /** Untimed game — clocks are hidden. */
+  untimed?: boolean;
   fen: string;
   moves: EngineMove[];
   turn: Color;
@@ -73,6 +75,7 @@ export function GameScreen({
   whiteMs,
   blackMs,
   activeClock,
+  untimed = false,
   fen,
   moves,
   interaction,
@@ -125,6 +128,7 @@ export function GameScreen({
             slot={black}
             active={activeClock === "b" && status === "playing"}
             timeMs={blackMs}
+            untimed={untimed}
             className="order-1"
           />
           <div className="order-2" data-testid="chess-board">
@@ -152,6 +156,7 @@ export function GameScreen({
             slot={white}
             active={activeClock === "w" && status === "playing"}
             timeMs={whiteMs}
+            untimed={untimed}
             className="order-3"
           />
           <GameControls
