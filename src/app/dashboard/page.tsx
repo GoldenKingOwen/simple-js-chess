@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Bell, Bot, ChartNoAxesCombined, Swords, Trophy, Users } from "lucide-react";
+import { ArrowRight, Bell, Bot, ChartNoAxesCombined, GraduationCap, Swords, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -80,10 +80,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick play actions */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { href: "/play/online", icon: Swords, title: "Quick play", subtitle: "Find an opponent" },
           { href: "/play/bot", icon: Bot, title: "Play the bot", subtitle: "Practice anytime" },
+          { href: "/learn", icon: GraduationCap, title: "Learn", subtitle: "Guided path to expert" },
           { href: "/play/local", icon: Users, title: "Local game", subtitle: "Play on this device" },
         ].map((action) => (
           <Link
