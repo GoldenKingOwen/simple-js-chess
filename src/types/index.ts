@@ -6,4 +6,5 @@ export * from "./learning";
 export * from "./leaderboard";
 export * from "./notification";
 export * from "./socket";
+export * from "./tournament";
 export * from "./user";

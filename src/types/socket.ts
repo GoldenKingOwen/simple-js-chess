@@ -34,6 +34,10 @@ export interface ClientToServerEvents {
   requestClockSync: (payload: { gameId: string }) => void;
   /** Update the player's presence. */
   setPresence: (payload: { status: "ONLINE" | "AWAY" }) => void;
+  /** Subscribe to a tournament's bracket-level events. */
+  joinTournament: (payload: { tournamentId: string }) => void;
+  /** Unsubscribe from a tournament room. */
+  leaveTournament: (payload: { tournamentId: string }) => void;
 }
 
 /**
@@ -84,6 +88,27 @@ export interface ServerToClientEvents {
   matchmakingMatched: (payload: { gameId: string }) => void;
   /** Matchmaking search was cancelled. */
   matchmakingCancelled: () => void;
+  /** A tournament round's pairings are ready (bracket room). */
+  roundStarted: (payload: {
+    tournamentId: string;
+    roundNumber: number;
+    round: Record<string, unknown>;
+  }) => void;
+  /** A tournament pairing was decided. */
+  pairingResult: (payload: {
+    tournamentId: string;
+    roundNumber: number;
+    pairingId: string;
+    gameId: string | null;
+    winnerId: string;
+    loserId: string;
+  }) => void;
+  /** The tournament finished. */
+  tournamentCompleted: (payload: {
+    tournamentId: string;
+    championUserId: string | null;
+    placements: Array<{ userId: string; username: string | null; placement: number | null }>;
+  }) => void;
   /** An error for the offending socket. */
   error: (payload: { code: string; message: string }) => void;
 }
@@ -106,6 +131,8 @@ export const SOCKET_EVENTS = {
   requestGameState: "requestGameState",
   requestClockSync: "requestClockSync",
   setPresence: "setPresence",
+  joinTournament: "joinTournament",
+  leaveTournament: "leaveTournament",
   // Server → client
   gameState: "gameState",
   moveMade: "moveMade",
@@ -121,6 +148,9 @@ export const SOCKET_EVENTS = {
   clockUpdate: "clockUpdate",
   matchmakingMatched: "matchmakingMatched",
   matchmakingCancelled: "matchmakingCancelled",
+  roundStarted: "roundStarted",
+  pairingResult: "pairingResult",
+  tournamentCompleted: "tournamentCompleted",
   error: "error",
 } as const;
 
