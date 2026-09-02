@@ -16,6 +16,7 @@ const NAV = [
   { href: "/", label: "Home" },
   { href: "/play", label: "Play" },
   { href: "/learn", label: "Learn" },
+  { href: "/tournaments", label: "Tournaments" },
   { href: "/games", label: "Games" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/friends", label: "Friends" },

@@ -80,11 +80,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick play actions */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {[
           { href: "/play/online", icon: Swords, title: "Quick play", subtitle: "Find an opponent" },
           { href: "/play/bot", icon: Bot, title: "Play the bot", subtitle: "Practice anytime" },
           { href: "/learn", icon: GraduationCap, title: "Learn", subtitle: "Guided path to expert" },
+          { href: "/tournaments", icon: Trophy, title: "Tournaments", subtitle: "Compete in a bracket" },
           { href: "/play/local", icon: Users, title: "Local game", subtitle: "Play on this device" },
         ].map((action) => (
           <Link

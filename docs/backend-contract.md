@@ -97,6 +97,25 @@ authoritative game state.
 | PUT    | `/friends/requests/:id`       | `{ accept }`      | —                  |
 | DELETE | `/friends/:userId`            | —                 | —                  |
 
+### Tournaments — `src/services/tournament-service.ts`
+
+| Method | Path                        | Body                              | Returns             |
+| ------ | --------------------------- | --------------------------------- | ------------------- |
+| GET    | `/tournaments`              | `?status=`                        | `TournamentSummary[]` (may be `{ tournaments }`) |
+| GET    | `/tournaments/:id`          | —                                 | `Tournament`        |
+| POST   | `/tournaments`              | `{ name, maxPlayers, timeControl }` | `Tournament`      |
+| POST   | `/tournaments/:id/join`     | —                                 | `Tournament`        |
+| POST   | `/tournaments/:id/leave`    | —                                 | `Tournament`        |
+| POST   | `/tournaments/:id/start`    | —                                 | `Tournament`        |
+
+Types in `src/types/tournament.ts`. Single-elimination only; a tournament game is
+a plain `ONLINE` game (open it via `/game/:id`). Seeding is by rating at start;
+the top seed byes on an odd field; a drawn bracket game advances the higher seed.
+Rounds advance automatically. `Tournament.viewer` carries per-request flags
+(`canJoin` / `canLeave` / `canStart` / …). Bracket updates arrive on the socket
+(`roundStarted`, `pairingResult`, `tournamentCompleted`) for the `tournament:<id>`
+room — join it with `joinTournament`.
+
 ### Leaderboard — `src/services/leaderboard-service.ts`
 
 | Method | Path            | Body / query                       | Returns            |
@@ -137,6 +156,7 @@ Typed in `src/types/socket.ts`; names must stay in sync.
 | `respondFriendRequest`| `{ requestId, accept }`                 |
 | `sendChallenge`   | `{ userId, timeControlId, rated }`          |
 | `subscribeMatchmaking` / `unsubscribeMatchmaking` | — |
+| `joinTournament` / `leaveTournament` | `{ tournamentId }` |
 
 ### Server → client
 
@@ -155,6 +175,9 @@ Typed in `src/types/socket.ts`; names must stay in sync.
 | `clockTick`           | `{ gameId, whiteMs, blackMs, turn }`      |
 | `matchmaking`         | `{ status, ticketId, queueSize }`         |
 | `matchFound`          | `{ ticketId, gameId, opponent, color, countdownMs, timeControlId, rated }` |
+| `roundStarted`        | `{ tournamentId, roundNumber, round }` (bracket room) |
+| `pairingResult`       | `{ tournamentId, roundNumber, pairingId, gameId, winnerId, loserId }` |
+| `tournamentCompleted` | `{ tournamentId, championUserId, placements[] }` |
 | `ping`                | —                                         |
 | `event`               | `{ type, message, data? }`                |
 
