@@ -58,6 +58,8 @@ export interface Game {
   currentPlayerColor: GameColor;
   /** The viewer's own color when the backend knows it (online games). */
   myColor?: GameColor;
+  /** Deepest recognized ECO opening; persisted for finished games. */
+  opening?: { eco: string; name: string; ply: number } | null;
 }
 
 export interface Move {

@@ -49,6 +49,13 @@ export interface ServerToClientEvents {
     move: Record<string, unknown>;
     game: Record<string, unknown>;
   }) => void;
+  /** The recognized ECO opening changed (deeper or different match). */
+  openingRecognized: (payload: {
+    gameId: string;
+    eco: string;
+    name: string;
+    matchedPly: number;
+  }) => void;
   /** A player joined the game room. */
   playerJoined: (payload: { gameId: string; player: SocketPlayer }) => void;
   /** A player disconnected. */
@@ -102,6 +109,7 @@ export const SOCKET_EVENTS = {
   // Server → client
   gameState: "gameState",
   moveMade: "moveMade",
+  openingRecognized: "openingRecognized",
   playerJoined: "playerJoined",
   playerDisconnected: "playerDisconnected",
   playerReconnected: "playerReconnected",

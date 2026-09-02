@@ -1,0 +1,28 @@
+{
+  "source": "lichess-org/chess-openings",
+  "generatedAt": "1970-01-01",
+  "placeholder": true,
+  "note": "Hand-seeded stopgap so builds/tests pass. Run `pnpm openings:generate` after vendoring scripts/chess-openings/*.tsv to replace this with the full dataset.",
+  "count": 18,
+  "maxPly": 6,
+  "book": {
+    "a3": { "eco": "A00", "name": "Anderssen's Opening" },
+    "b3": { "eco": "A01", "name": "Nimzo-Larsen Attack" },
+    "c4": { "eco": "A10", "name": "English Opening" },
+    "c4 e5": { "eco": "A20", "name": "English Opening: Reversed Sicilian" },
+    "c4 c5": { "eco": "A30", "name": "English Opening: Symmetrical Variation" },
+    "c4 Nf6": { "eco": "A15", "name": "English Opening: Anglo-Indian Defense" },
+    "d4": { "eco": "A40", "name": "Queen's Pawn Game" },
+    "d4 d5": { "eco": "D00", "name": "Queen's Pawn Game" },
+    "d4 Nf6": { "eco": "A45", "name": "Indian Defense" },
+    "d4 Nf6 c4 e6 Nc3 Bb4": { "eco": "E20", "name": "Nimzo-Indian Defense" },
+    "e4": { "eco": "B00", "name": "King's Pawn Game" },
+    "e4 e5": { "eco": "C20", "name": "King's Pawn Game" },
+    "e4 e5 Nf3": { "eco": "C40", "name": "King's Knight Opening" },
+    "e4 e5 Nf3 Nc6": { "eco": "C44", "name": "King's Knight Opening: Normal Variation" },
+    "e4 e5 Nf3 Nc6 Bb5": { "eco": "C60", "name": "Ruy Lopez" },
+    "e4 e5 Nf3 Nc6 Bc4": { "eco": "C50", "name": "Italian Game" },
+    "e4 c5": { "eco": "B20", "name": "Sicilian Defense" },
+    "e4 e6": { "eco": "C00", "name": "French Defense" }
+  }
+}

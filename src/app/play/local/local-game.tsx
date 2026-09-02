@@ -187,6 +187,7 @@ function LocalMatch({ config }: { config: LocalConfig }) {
         status={game.status}
         result={game.result}
         checkSquare={game.checkSquare}
+        opening={game.opening}
         drawOffered={game.drawOfferedBy !== null}
         drawReceived={game.drawOfferedBy !== null}
         onMove={handleMove}
