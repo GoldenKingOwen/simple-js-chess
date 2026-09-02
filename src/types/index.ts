@@ -2,6 +2,7 @@ export * from "./api";
 export * from "./chat";
 export * from "./friend";
 export * from "./game";
+export * from "./learning";
 export * from "./leaderboard";
 export * from "./notification";
 export * from "./socket";

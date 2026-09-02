@@ -68,6 +68,23 @@ current streak and recent matches.
 `MatchmakingTicket = { id?, status: "searching"|"found", timeControlId, rated, match? }`
 where `match = { gameId, opponent, color, countdownMs }`.
 
+### Learning path — `src/services/learning-service.ts`
+
+| Method | Path                                | Body                        | Returns                  |
+| ------ | ----------------------------------- | --------------------------- | ------------------------ |
+| GET    | `/learning/path`                    | —                           | `LearningPath`           |
+| GET    | `/learning/lessons/:slug`           | —                           | `Lesson` (403 if tier locked) |
+| POST   | `/learning/lessons/:slug/attempt`   | `{ puzzleId, moves: string[] }` | `PuzzleAttemptResult` |
+| POST   | `/learning/lessons/:slug/practice`  | —                           | `{ gameId }`             |
+| POST   | `/learning/lessons/:slug/complete`  | —                           | `LessonCompletionResult` |
+
+Types in `src/types/learning.ts`. Tiers (`BEGINNER`→`EXPERT`) unlock sequentially,
+server-enforced. Puzzle attempts are validated server-side against the stored
+solution — `moves` is the solver's line so far in UCI; `correct:false` means the
+line diverged (nothing recorded). Bot-practice lessons are real `GameMode.BOT`
+games (played through `/game/:id`); `…/complete` re-checks the objective from the
+authoritative game state.
+
 ### Friends — `src/services/friend-service.ts`
 
 | Method | Path                          | Body / query      | Returns            |
