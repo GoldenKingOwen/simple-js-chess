@@ -60,6 +60,8 @@ export interface ServerToClientEvents {
     name: string;
     matchedPly: number;
   }) => void;
+  /** On-demand post-game analysis finished (or failed) for this game. */
+  analysisComplete: (payload: { gameId: string; status: "COMPLETE" | "FAILED" }) => void;
   /** A player joined the game room. */
   playerJoined: (payload: { gameId: string; player: SocketPlayer }) => void;
   /** A player disconnected. */
@@ -137,6 +139,7 @@ export const SOCKET_EVENTS = {
   gameState: "gameState",
   moveMade: "moveMade",
   openingRecognized: "openingRecognized",
+  analysisComplete: "analysisComplete",
   playerJoined: "playerJoined",
   playerDisconnected: "playerDisconnected",
   playerReconnected: "playerReconnected",

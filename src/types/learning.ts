@@ -38,7 +38,7 @@ export interface Lesson {
   type: LessonType;
   tier: LessonTier;
   status: LessonStatus;
-  concept?: { text: string; fen: string };
+  concept?: { text: string; fen: string; source?: string | null };
   puzzleSet?: { required: number; solvedCount: number; puzzles: LessonPuzzle[] };
   botPractice?: { objective: string; difficulty: string; gameId: string | null };
 }

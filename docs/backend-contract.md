@@ -97,6 +97,33 @@ authoritative game state.
 | PUT    | `/friends/requests/:id`       | `{ accept }`      | —                  |
 | DELETE | `/friends/:userId`            | —                 | —                  |
 
+### Post-game analysis — `src/services/analysis-service.ts`
+
+| Method | Path                  | Body | Returns                        |
+| ------ | --------------------- | ---- | ------------------------------ |
+| POST   | `/games/:id/analysis` | —    | `GameAnalysis` (idempotent)    |
+| GET    | `/games/:id/analysis` | —    | `GameAnalysis \| null`         |
+
+On-demand only (an explicit "Analyze game" action), then cached. `GameAnalysis`
+= `{ status: PENDING|RUNNING|COMPLETE|FAILED, depth, plies: AnalyzedPly[] }`.
+Poll while `PENDING`/`RUNNING`, or listen for the `analysisComplete` socket
+event on the game room. Types in `src/types/analysis.ts`.
+
+### Achievements — `src/services/achievement-service.ts`
+
+| Method | Path                            | Returns         |
+| ------ | ------------------------------- | --------------- |
+| GET    | `/achievements/me`              | `Achievement[]` |
+| GET    | `/achievements/users/:username` | `Achievement[]` |
+
+`Achievement` = `{ id, name, description, icon, earned, earnedAt }`. Earned
+badges arrive as `ACHIEVEMENT_EARNED` notifications (mapped to type `achievement`).
+
+### Openings — part of `src/services/profile-service.ts`
+
+`GET /profiles/:username/openings?limit=5` → `{ totalGamesWithOpening,
+distinctOpenings, openings: [{ eco, name, games, wins, losses, draws, winRate }] }`.
+
 ### Tournaments — `src/services/tournament-service.ts`
 
 | Method | Path                        | Body                              | Returns             |
@@ -165,6 +192,7 @@ Typed in `src/types/socket.ts`; names must stay in sync.
 | `gameState`           | `Game` (full authoritative state)         |
 | `moveMade`            | `{ game, move }`                          |
 | `openingRecognized`   | `{ gameId, eco, name, matchedPly }` — emitted only when the matched ECO opening changes (ONLINE/BOT); never cleared once matched |
+| `analysisComplete`    | `{ gameId, status }` — on-demand post-game analysis finished (or failed) |
 | `gameEnded`           | `{ gameId, result, game }`                |
 | `playerJoined`        | `{ gameId, userId, username }`            |
 | `playerDisconnected`  | `{ gameId, userId }`                      |
