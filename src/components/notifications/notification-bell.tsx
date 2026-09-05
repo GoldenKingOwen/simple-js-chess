@@ -1,7 +1,9 @@
 "use client";
 
-import { Bell } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Award, Bell } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -21,6 +23,25 @@ export function NotificationBell() {
   const markRead = useMarkNotificationsRead();
 
   const unreadCount = unread ?? page?.unreadCount ?? 0;
+
+  // Toast newly-arrived achievement notifications, consistent with how other
+  // ephemeral confirmations surface (sonner). The first poll only seeds the
+  // "seen" set so historical badges don't toast on load.
+  const seen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const notifications = page?.notifications ?? [];
+    if (seen.current === null) {
+      seen.current = new Set(notifications.map((n) => n.id));
+      return;
+    }
+    for (const n of notifications) {
+      if (seen.current.has(n.id)) continue;
+      seen.current.add(n.id);
+      if (n.type === "achievement" && !n.read) {
+        toast.success(n.title, { description: n.body, icon: <Award className="h-4 w-4" /> });
+      }
+    }
+  }, [page?.notifications]);
 
   return (
     <Popover>

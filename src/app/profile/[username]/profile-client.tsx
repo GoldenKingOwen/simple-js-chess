@@ -3,14 +3,16 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, Flag, Gamepad2, Globe2, Swords, Timer, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarDays, Flag, Gamepad2, Globe2, Swords, Timer, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { RatingChart } from "@/components/profile/rating-chart";
+import { BadgeGrid } from "@/components/achievements/badge-grid";
 import { profileService } from "@/services/profile-service";
 import { gameService } from "@/services/game-service";
+import { useUserAchievements } from "@/hooks/use-achievements";
 import { useAuthStore } from "@/stores/auth-store";
 import { ApiError } from "@/types/api";
 import { cn } from "@/lib/utils";
@@ -28,6 +30,13 @@ export function ProfileClient({ username }: { username: string }) {
     queryKey: ["games", "history", username],
     queryFn: () => gameService.getGames(username),
   });
+
+  const { data: openingStats } = useQuery({
+    queryKey: ["profile", username, "openings"],
+    queryFn: () => profileService.getOpeningStats(username),
+  });
+
+  const { data: achievements } = useUserAchievements(username);
 
   const recentGames = useMemo(() => {
     if (!profile || !games) return [];
@@ -129,6 +138,19 @@ export function ProfileClient({ username }: { username: string }) {
         </CardContent>
       </Card>
 
+      {achievements && achievements.some((a) => a.earned) && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-1.5 text-base">
+              <Trophy className="h-4 w-4 text-primary" aria-hidden="true" /> Badges
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BadgeGrid achievements={achievements} earnedOnly />
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         {/* Stats */}
         <Card>
@@ -150,6 +172,59 @@ export function ProfileClient({ username }: { username: string }) {
                 <div className="text-xs text-muted-foreground">{stat.label}</div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* Most played openings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-1.5 text-base">
+              <BookOpen className="h-4 w-4 text-primary" aria-hidden="true" /> Most played openings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {!openingStats || openingStats.openings.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No finished games with a recognised opening yet.
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {openingStats.openings.map((opening) => (
+                  <li key={`${opening.eco}-${opening.name}`} className="px-4 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm font-medium">
+                        {opening.name}
+                        {opening.eco && (
+                          <span className="ml-1.5 text-xs text-muted-foreground">{opening.eco}</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {opening.games} game{opening.games === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <span
+                          className="bg-emerald-500"
+                          style={{ width: `${(opening.wins / opening.games) * 100}%` }}
+                        />
+                        <span
+                          className="bg-muted-foreground/30"
+                          style={{ width: `${(opening.draws / opening.games) * 100}%` }}
+                        />
+                        <span
+                          className="bg-destructive"
+                          style={{ width: `${(opening.losses / opening.games) * 100}%` }}
+                        />
+                      </div>
+                      <span className="shrink-0 text-xs font-medium tabular-nums">
+                        {opening.winRate}%
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
 
