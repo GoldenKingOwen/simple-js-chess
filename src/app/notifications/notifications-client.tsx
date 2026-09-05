@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, Gamepad2, Gift, Swords, Trophy, UserPlus } from "lucide-react";
+import { Award, Bell, CheckCheck, Gamepad2, Gift, Swords, Trophy, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ const ICONS: Record<NotificationType, typeof Bell> = {
   game_invitation: Gamepad2,
   challenge: Swords,
   game_result: Trophy,
+  achievement: Award,
   match_found: Gift,
   system: Bell,
 };

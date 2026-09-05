@@ -112,7 +112,12 @@ function ConceptView({
     <>
       <LessonBanner tier={lesson.tier} title={lesson.title} />
       <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
-        <p className="text-sm leading-relaxed text-muted-foreground">{lesson.concept?.text}</p>
+        <div>
+          <p className="text-sm leading-relaxed text-muted-foreground">{lesson.concept?.text}</p>
+          {lesson.concept?.source && (
+            <p className="mt-3 text-xs italic text-muted-foreground">— {lesson.concept.source}</p>
+          )}
+        </div>
         <div className="mx-auto w-full max-w-[320px]">
           <ChessBoard
             fen={lesson.concept?.fen ?? "8/8/8/8/8/8/8/8 w - - 0 1"}

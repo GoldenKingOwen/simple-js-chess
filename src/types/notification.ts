@@ -4,6 +4,7 @@ export type NotificationType =
   | "game_invitation"
   | "challenge"
   | "game_result"
+  | "achievement"
   | "system"
   | "match_found";
 

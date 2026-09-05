@@ -13,6 +13,8 @@ import { profileService } from "@/services/profile-service";
 import { gameService } from "@/services/game-service";
 import { friendService } from "@/services/friend-service";
 import { notificationService } from "@/services/notification-service";
+import { BadgeGrid } from "@/components/achievements/badge-grid";
+import { useMyAchievements } from "@/hooks/use-achievements";
 import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
@@ -24,6 +26,8 @@ export default function DashboardPage() {
     queryFn: () => profileService.getProfile(user?.username ?? "me"),
     enabled: Boolean(user),
   });
+
+  const { data: achievements } = useMyAchievements(Boolean(user));
 
   const { data: recentGames, isLoading: gamesLoading } = useQuery({
     queryKey: ["games", "recent"],
@@ -133,6 +137,21 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Badges */}
+          {achievements && achievements.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5 text-base">
+                  <Trophy className="h-4 w-4 text-primary" aria-hidden="true" /> Badges
+                </CardTitle>
+                <CardDescription>Milestones you&apos;ve unlocked across the app.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <BadgeGrid achievements={achievements} />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Recent games */}
           <Card>

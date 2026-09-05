@@ -3,6 +3,7 @@ import { USE_MOCK_API } from "@/config/env";
 import { mapUser } from "@/lib/api/adapters";
 import type {
   ChangePasswordInput,
+  OpeningStats,
   Profile,
   ProfileStats,
   RatingPoint,
@@ -19,6 +20,7 @@ export interface ProfileService {
   changePassword(input: ChangePasswordInput): Promise<void>;
   updateEmail(input: UpdateEmailInput): Promise<void>;
   getRatingHistory(username: string): Promise<RatingPoint[]>;
+  getOpeningStats(username: string): Promise<OpeningStats>;
 }
 
 const realProfileService: ProfileService = {
@@ -75,6 +77,17 @@ const realProfileService: ProfileService = {
     if (!user?.id) return [];
     const raw = await apiClient.get<unknown>(`/ratings/users/${user.id}/history`);
     return toRatingPoints(raw);
+  },
+  async getOpeningStats(username) {
+    const raw = await apiClient.get<Partial<OpeningStats>>(
+      `/profiles/${encodeURIComponent(username)}/openings`,
+      { query: { limit: 5 } },
+    );
+    return {
+      totalGamesWithOpening: raw.totalGamesWithOpening ?? 0,
+      distinctOpenings: raw.distinctOpenings ?? 0,
+      openings: Array.isArray(raw.openings) ? raw.openings : [],
+    };
   },
 };
 

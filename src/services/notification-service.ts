@@ -54,6 +54,8 @@ const NOTIFICATION_TYPES: Record<string, NotificationType> = {
   GAME_ENDED: "game_result",
   GAME_RESULT: "game_result",
   MATCH_FOUND: "match_found",
+  ACHIEVEMENT_EARNED: "achievement",
+  TOURNAMENT_PAIRING: "game_invitation",
   SYSTEM: "system",
 };
 
