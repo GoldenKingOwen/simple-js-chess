@@ -11,7 +11,7 @@ import { gameService } from "@/services/game-service";
 import { authService } from "@/services/auth-service";
 import { connectSocket, onSocket, emitSocket, disconnectSocket, getSocket, setSocketAuth } from "@/lib/socket/socket-client";
 import { SOCKET_EVENTS } from "@/lib/socket/socket-events";
-import { mapChatMessage, mapGame } from "@/lib/api/adapters";
+import { mapChatMessage, mapGame, mapMove } from "@/lib/api/adapters";
 import { USE_MOCK_API } from "@/config/env";
 import { MOCK_CURRENT_USER, mockChat } from "@/services/mock/mock-data";
 import { useAuthStore } from "@/stores/auth-store";
@@ -170,13 +170,31 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
     connectSocket();
     emitSocket(SOCKET_EVENTS.joinGame, { gameId });
 
+    // The move/state socket payloads carry the position but not the full move
+    // list, so mapping them alone would blank out the history the initial REST
+    // load fetched. Keep the accumulated history: append the new move on
+    // moveMade, and carry the existing list forward on gameState/gameEnded.
+    const withHistory = (payload: { game: Record<string, unknown> }, appendMove?: Record<string, unknown>) => {
+      setGame((current) => {
+        const next = mapGame(payload.game);
+        if (next.moveHistory.length > 0) return next;
+        let history = current?.moveHistory ?? [];
+        if (appendMove && typeof appendMove.uci === "string") {
+          history = [...history, mapMove(appendMove, history.length)];
+        }
+        next.moveHistory = history;
+        next.moves = history.map((m) => m.san);
+        return next;
+      });
+    };
+
     const unsubs = [
       onSocket(SOCKET_EVENTS.gameState, (payload) => {
-        setGame(mapGame(payload.game));
+        withHistory(payload);
         setActionError(null);
       }),
       onSocket(SOCKET_EVENTS.moveMade, (payload) => {
-        setGame(mapGame(payload.game));
+        withHistory(payload, payload.move as Record<string, unknown>);
         setActionError(null);
       }),
       onSocket(SOCKET_EVENTS.openingRecognized, (payload) =>
@@ -186,7 +204,7 @@ export function OnlineGameClient({ gameId }: { gameId: string }) {
             : current,
         ),
       ),
-      onSocket(SOCKET_EVENTS.gameEnded, (payload) => setGame(mapGame(payload.game))),
+      onSocket(SOCKET_EVENTS.gameEnded, (payload) => withHistory(payload)),
       onSocket(SOCKET_EVENTS.drawOffered, (payload) =>
         setGame((current) => (current ? { ...current, drawOfferBy: payload.offeredBy } : current)),
       ),
