@@ -40,6 +40,22 @@ export interface RatingPoint {
   rating: number;
 }
 
+export interface OpeningStat {
+  eco: string;
+  name: string;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number;
+}
+
+export interface OpeningStats {
+  totalGamesWithOpening: number;
+  distinctOpenings: number;
+  openings: OpeningStat[];
+}
+
 export interface Rating {
   userId: string;
   username: string;

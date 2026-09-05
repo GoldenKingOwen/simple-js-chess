@@ -77,4 +77,19 @@ export const mockUsers: ProfileService = {
     const user = MOCK_USERS.find((u) => u.username.toLowerCase() === username.toLowerCase()) ?? MOCK_CURRENT_USER;
     return buildRatingHistory(user.rating);
   },
+  async getOpeningStats() {
+    await delay(150);
+    const openings = [
+      { eco: "B10", name: "Caro-Kann Defense", games: 34, wins: 20, losses: 10, draws: 4 },
+      { eco: "C50", name: "Italian Game", games: 28, wins: 13, losses: 12, draws: 3 },
+      { eco: "D02", name: "Queen's Pawn Game", games: 19, wins: 8, losses: 9, draws: 2 },
+      { eco: "B01", name: "Scandinavian Defense", games: 12, wins: 7, losses: 4, draws: 1 },
+      { eco: "A40", name: "Queen's Pawn: Modern", games: 9, wins: 3, losses: 5, draws: 1 },
+    ].map((o) => ({ ...o, winRate: Math.round((o.wins / o.games) * 1000) / 10 }));
+    return {
+      totalGamesWithOpening: openings.reduce((n, o) => n + o.games, 0),
+      distinctOpenings: openings.length,
+      openings,
+    };
+  },
 };
