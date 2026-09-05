@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -180,8 +180,10 @@ function PuzzleView({ lesson, onChange }: { lesson: Lesson; onChange: () => void
   );
 }
 
-function BotPracticeView({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) {
+export function BotPracticeView({ lesson, onChange }: { lesson: Lesson; onChange: () => void }) {
   const gameId = lesson.botPractice?.gameId ?? null;
+  const done = lesson.status === "COMPLETED";
+  const [manualReason, setManualReason] = useState<string | null>(null);
 
   const start = useMutation({
     mutationFn: () => learningService.startPractice(lesson.slug),
@@ -190,8 +192,32 @@ function BotPracticeView({ lesson, onChange }: { lesson: Lesson; onChange: () =>
 
   const check = useMutation({
     mutationFn: () => learningService.completeLesson(lesson.slug),
-    onSuccess: onChange,
+    // Only refetch the path when something actually changed — the auto-poll
+    // below runs every few seconds and most calls just report "not yet".
+    onSuccess: (result) => {
+      if (result.met) onChange();
+    },
   });
+
+  // The bot game shows its own "game over" dialog with no idea this is a lesson,
+  // so don't make the learner hunt for a "check objective" button behind it:
+  // poll the objective automatically while a game is in progress (also catches
+  // the case where they finished, left, and came back). The manual button stays
+  // as a fallback — and it's the only way to claim a "survive to move N"
+  // objective, which is met before the game is actually over.
+  const checkRef = useRef(check.mutate);
+  useEffect(() => {
+    checkRef.current = check.mutate;
+  });
+  useEffect(() => {
+    if (!gameId || done) return;
+    const run = () => checkRef.current();
+    run();
+    const id = window.setInterval(run, 6000);
+    return () => window.clearInterval(id);
+  }, [gameId, done]);
+
+  const complete = done || check.data?.met === true;
 
   return (
     <>
@@ -200,8 +226,8 @@ function BotPracticeView({ lesson, onChange }: { lesson: Lesson; onChange: () =>
       {!gameId ? (
         <div className="mx-auto max-w-md rounded-xl border bg-card/60 p-6 text-center">
           <p className="mb-4 text-sm text-muted-foreground">
-            You&apos;ll play a full game against the {lesson.botPractice?.difficulty} bot. When it&apos;s
-            over, come back here and check the objective.
+            You&apos;ll play a full game against the {lesson.botPractice?.difficulty} bot. The lesson
+            completes on its own once you meet the objective.
           </p>
           <Button onClick={() => start.mutate()} disabled={start.isPending}>
             {start.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -210,31 +236,43 @@ function BotPracticeView({ lesson, onChange }: { lesson: Lesson; onChange: () =>
         </div>
       ) : (
         <>
+          {complete && (
+            <div className="mx-auto mb-4 flex max-w-3xl flex-col items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-center">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600">
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> Objective met — lesson complete!
+              </span>
+              <Button size="sm" render={<Link href="/learn" />}>
+                Back to the learning path <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+          )}
+
           {/* Reuse the full online game screen as-is. */}
           <OnlineGameClient key={gameId} gameId={gameId} />
 
-          <div className="mx-auto mt-4 flex max-w-3xl flex-col items-center gap-2">
-            <Button onClick={() => check.mutate()} disabled={check.isPending}>
-              {check.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Check objective
-            </Button>
-            {check.data && (
-              <p
-                className={
-                  check.data.met
-                    ? "text-sm font-medium text-emerald-600"
-                    : "text-sm font-medium text-muted-foreground"
-                }
+          {!complete && (
+            <div className="mx-auto mt-4 flex max-w-3xl flex-col items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setManualReason(null);
+                  check
+                    .mutateAsync()
+                    .then((r) => {
+                      if (!r.met) setManualReason(r.reason ?? "Not yet — keep playing.");
+                    })
+                    .catch(() => setManualReason("Couldn't reach the server — try again."));
+                }}
+                disabled={check.isPending}
               >
-                {check.data.met ? "Objective met — lesson complete!" : check.data.reason ?? "Not yet."}
-              </p>
-            )}
-            {lesson.status === "COMPLETED" && !check.data && (
-              <p className="inline-flex items-center gap-1 text-sm text-emerald-600">
-                <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Completed
-              </p>
-            )}
-          </div>
+                {check.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Check objective now
+              </Button>
+              {manualReason && (
+                <p className="text-sm font-medium text-muted-foreground">{manualReason}</p>
+              )}
+            </div>
+          )}
         </>
       )}
     </>
