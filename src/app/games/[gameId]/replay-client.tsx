@@ -3,17 +3,21 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Square } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChessBoard } from "@/components/chess/chess-board";
 import { MoveList } from "@/components/game/move-list";
 import { PgnPanel } from "@/components/game/pgn-panel";
+import { EvalGraph } from "@/components/game/eval-graph";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { gameService } from "@/services/game-service";
+import { useGameAnalysis } from "@/hooks/use-analysis";
+import { useAuthStore } from "@/stores/auth-store";
 import { STARTING_FEN } from "@/stores/game-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import type { MoveClassification } from "@/types";
 import type { EngineMove, Square as ChessSquare } from "@/lib/chess/chess-engine";
 
 export function ReplayClient({ gameId }: { gameId: string }) {
@@ -21,11 +25,15 @@ export function ReplayClient({ gameId }: { gameId: string }) {
   const pieceStyle = useSettingsStore((state) => state.pieceStyle);
   const [position, setPosition] = useState(-1); // -1 = start, 0..n = after move n
 
+  const user = useAuthStore((state) => state.user);
+
   const { data: game, isLoading } = useQuery({
     queryKey: ["game", gameId],
     queryFn: () => gameService.getGame(gameId),
     retry: 1,
   });
+
+  const { analysis, isRunning, isComplete, isFailed, start } = useGameAnalysis(gameId);
 
   const moves = useMemo<EngineMove[]>(
     () =>
@@ -50,6 +58,14 @@ export function ReplayClient({ gameId }: { gameId: string }) {
   const total = moves.length;
   const atStart = position <= -1;
   const atEnd = position >= total - 1;
+
+  const plies = useMemo(() => analysis?.plies ?? [], [analysis?.plies]);
+  const classifications = useMemo<Record<number, MoveClassification>>(() => {
+    const map: Record<number, MoveClassification> = {};
+    for (const p of plies) if (p.classification !== "GOOD") map[p.ply] = p.classification;
+    return map;
+  }, [plies]);
+  const currentPly = position >= 0 ? plies[position] : undefined;
 
   const fen = position === -1 ? STARTING_FEN : moves[Math.max(0, Math.min(position, total - 1))].after;
   const lastMove = position >= 0 && position < total ? { from: moves[position].from, to: moves[position].to } : null;
@@ -148,6 +164,48 @@ export function ReplayClient({ gameId }: { gameId: string }) {
               <ChevronsRight className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
+
+          {/* Post-game analysis (finished games only; backend enforces too) */}
+          {game.result ? (
+            <div className="mt-4">
+              {!analysis && !isRunning ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={start}
+                  disabled={!user}
+                  title={user ? undefined : "Log in to analyze games"}
+                >
+                  <BarChart3 className="mr-2 h-4 w-4" aria-hidden="true" /> Analyze game
+                </Button>
+              ) : isRunning ? (
+                <div className="flex items-center justify-center gap-2 rounded-lg border bg-muted/30 py-3 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Analyzing every move…
+                </div>
+              ) : isFailed ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">
+                  <span className="text-destructive">Analysis failed.</span>
+                  <Button size="sm" variant="outline" onClick={start}>
+                    Retry
+                  </Button>
+                </div>
+              ) : isComplete ? (
+                <div className="space-y-2">
+                  <EvalGraph plies={plies} position={position} onSeek={setPosition} />
+                  {currentPly?.missedBest && currentPly.classification !== "GOOD" && (
+                    <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs">
+                      <span className="font-semibold text-amber-700">Best move was {currentPly.bestUci}</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        — {currentPly.san} lost {(currentPly.cpLoss / 100).toFixed(1)} pawns
+                      </span>
+                    </p>
+                  )}
+                  <AnalysisSummary plies={plies} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {/* Move list + PGN */}
@@ -159,7 +217,12 @@ export function ReplayClient({ gameId }: { gameId: string }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="h-[calc(100%-3.5rem)] p-2 pt-0">
-              <MoveList moves={moves} activeIndex={position} onSelectMove={(index) => setPosition(index)} />
+              <MoveList
+                moves={moves}
+                activeIndex={position}
+                onSelectMove={(index) => setPosition(index)}
+                classifications={isComplete ? classifications : undefined}
+              />
             </CardContent>
           </Card>
 
@@ -176,5 +239,28 @@ export function ReplayClient({ gameId }: { gameId: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function AnalysisSummary({ plies }: { plies: import("@/types").AnalyzedPly[] }) {
+  const tally = (color: "WHITE" | "BLACK", cls: string) =>
+    plies.filter((p) => p.color === color && p.classification === cls).length;
+  const rows = [
+    { label: "Inaccuracies", cls: "INACCURACY", tone: "text-amber-600" },
+    { label: "Mistakes", cls: "MISTAKE", tone: "text-orange-600" },
+    { label: "Blunders", cls: "BLUNDER", tone: "text-destructive" },
+  ];
+  return (
+    <table className="w-full rounded-lg border text-xs">
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.cls} className="border-b last:border-0">
+            <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{tally("WHITE", row.cls)}</td>
+            <td className={`px-2 py-1.5 text-center ${row.tone}`}>{row.label}</td>
+            <td className="px-3 py-1.5 tabular-nums font-semibold">{tally("BLACK", row.cls)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
